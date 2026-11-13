@@ -87,3 +87,21 @@ Exact Discord/Fastify/React/Vite/OpenAI/Google SDK pins, supported model IDs, ef
 reasoning/cached-token accounting and model ceilings must be verified when those packages
 are introduced. No claim is made that a concrete model or billing boundary has been
 validated in Task 1. Recheck current official sources during those tasks.
+
+
+## Task 2 compatibility notes
+
+Task 2 adds no npm dependencies; the Node 26.13.1/npm 11.20.0 lockfile remains unchanged.
+Node's built-in `node:crypto` provides AES-256-GCM, random nonces and authentication tags.
+The [official Node crypto API](https://nodejs.org/docs/latest-v26.x/api/crypto.html)
+documents `setAAD`, `getAuthTag`, `setAuthTag` and authenticated finalisation; the
+implementation uses explicit associated data and the default 16-byte GCM tag.
+
+The official Discord source sections for **Get Guild Member**, **Get Guild Roles**, **Get
+Guild**, and **Get Channel** support the injected REST paths in Task 2. The distinct
+**List Guild Members** endpoint requires a privileged intent; Task 2 never lists members
+or enables a member/presence intent. OAuth's `guilds.members.read` scope is an alternative
+for the current user's member endpoint, but this implementation uses individual
+bot-authenticated member lookups and never treats OAuth guild lists as current proof.
+Fresh transport responses are required on protected operations. No live Discord lookup
+was performed. See [settings/access contracts](settings-access.md) for wiring requirements.

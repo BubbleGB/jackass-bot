@@ -1,4 +1,4 @@
-name: Task 1 checks
+name: Project checks
 on:
   push:
   pull_request:

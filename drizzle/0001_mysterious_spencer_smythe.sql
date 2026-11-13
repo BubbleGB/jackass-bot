@@ -1,0 +1,3 @@
+ALTER TABLE "provider_configs" DROP CONSTRAINT "provider_config_bounds";--> statement-breakpoint
+ALTER TABLE "provider_configs" ALTER COLUMN "model_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "provider_configs" ADD CONSTRAINT "provider_config_bounds" CHECK ("provider_configs"."provider" IN ('openai','google') AND "provider_configs"."priority" BETWEEN 1 AND 2 AND "provider_configs"."daily_allowance" >= 0 AND "provider_configs"."revision" > 0 AND "provider_configs"."key_version" > 0 AND ("provider_configs"."model_id" IS NULL OR length("provider_configs"."model_id") BETWEEN 1 AND 200) AND octet_length("provider_configs"."nonce") = 12 AND octet_length("provider_configs"."ciphertext") > 16);
