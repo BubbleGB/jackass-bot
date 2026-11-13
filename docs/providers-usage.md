@@ -133,3 +133,9 @@ Limits: Google uses a conservative full-window input reservation; real credentia
 access and billing were not probed; Google uses a published stable alias rather than a
 nonexistent dated snapshot. Native CI proves these fixtures and database contracts, not
 provider production acceptance or pricing. No Task 4 implementation has begun.
+
+
+Follow-up: [Google reservation investigation](google-reservation-investigation.md) traces
+both full-window admission sites, separates documented limits from conservative choices,
+examines countTokens guarantees/schema coverage, and records small-allowance regressions.
+A smaller strict reservation was not established; model/API/allowances remain unchanged.

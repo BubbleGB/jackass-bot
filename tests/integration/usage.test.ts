@@ -87,6 +87,43 @@ describe('atomic usage reservations and settlement', () => {
     await expect(router.generateWithFallback(request,input)).rejects.toThrow('request_not_claimed'); expect(calls).toBe(3);
     expect(JSON.stringify((await db.pool.query('SELECT * FROM operational_errors')).rows)).not.toContain('private upstream detail');
   });
+  it.each([100,1000,2048,5000,50000,1050623])('keeps a short Google request within a small daily allowance of %i without increasing it', async allowance => {
+    await db.pool.query("DELETE FROM provider_configs WHERE guild_id=$1 AND provider='openai'",[guild]);
+    await db.pool.query("UPDATE provider_configs SET model_id='gemini-3.5-flash-lite',daily_allowance=$2 WHERE guild_id=$1 AND provider='google'",[guild,allowance]);
+    let calls = 0;
+    const adapter = new GoogleAdapter(async () => { calls++; throw new Error('generation must not start'); });
+    const router = new ProviderRouter(new PostgresProviderRepository(db),usage,{ open() { return 'fake-key'; } },new Map([['google',adapter]]),() => now);
+    const request: BotRequest = { id: 'short_google',guildId: guild,channelId: other,userId: other,source: 'ask',receivedAt: now };
+    const input: GenerationInput = { instructions: 'Be kind.',context: [{ id: '1',authorId: other,kind: 'human',text: 'Hi',timestamp: now }],modelId: 'gemini-3.5-flash-lite',mode: 'direct',maxGenerationTokens: 2048 };
+    await expect(router.generateWithFallback(request,input)).rejects.toThrow('providers_unavailable');
+    expect(calls).toBe(0);
+    expect((await db.pool.query('SELECT count(*) FROM usage_reservations WHERE guild_id=$1',[guild])).rows[0].count).toBe('0');
+    expect((await db.pool.query("SELECT daily_allowance FROM provider_configs WHERE guild_id=$1 AND provider='google'",[guild])).rows[0].daily_allowance).toBe(String(allowance));
+  });
+  it('holds the full Google ceiling before a short mocked call, then reconciles without changing the allowance', async () => {
+    await db.pool.query("DELETE FROM provider_configs WHERE guild_id=$1 AND provider='openai'",[guild]);
+    await db.pool.query("UPDATE provider_configs SET model_id='gemini-3.5-flash-lite',daily_allowance=1050624 WHERE guild_id=$1 AND provider='google'",[guild]);
+    let calls = 0;
+    const adapter = new GoogleAdapter(async r => {
+      calls++; expect(r.url).toBe('https://generativelanguage.googleapis.com/v1beta/interactions');
+      expect((await db.pool.query("SELECT reserved_tokens FROM daily_usage WHERE guild_id=$1 AND provider='google'",[guild])).rows[0].reserved_tokens).toBe('1050624');
+      return { status: 200,headers: {},body: { status: 'completed',steps: [{ type: 'model_output',content: [{ type: 'text',text: '{"kind":"answer","text":"Hello"}' }] }],usage: { total_input_tokens: 20,total_output_tokens: 6,total_thought_tokens: 4,total_tokens: 30 } } };
+    });
+    const router = new ProviderRouter(new PostgresProviderRepository(db),usage,{ open() { return 'fake-key'; } },new Map([['google',adapter]]),() => now);
+    const request: BotRequest = { id: 'short_google_exact',guildId: guild,channelId: other,userId: other,source: 'ask',receivedAt: now };
+    const input: GenerationInput = { instructions: 'Be kind.',context: [{ id: '1',authorId: other,kind: 'human',text: 'Hi',timestamp: now }],modelId: 'gemini-3.5-flash-lite',mode: 'direct',maxGenerationTokens: 2048 };
+    expect((await router.generateWithFallback(request,input)).kind).toBe('answer'); expect(calls).toBe(1);
+    expect((await db.pool.query("SELECT total_tokens,reserved_tokens,uncertain_tokens FROM daily_usage WHERE guild_id=$1 AND provider='google'",[guild])).rows[0]).toEqual({ total_tokens: '30',reserved_tokens: '0',uncertain_tokens: '0' });
+    expect((await db.pool.query("SELECT daily_allowance FROM provider_configs WHERE guild_id=$1 AND provider='google'",[guild])).rows[0].daily_allowance).toBe('1050624');
+  });
+  it.each(['total_tokens','uncertain_tokens','reserved_tokens'])('counts existing %s against Google headroom rather than treating the daily allowance as available balance', async column => {
+    await db.pool.query("DELETE FROM provider_configs WHERE guild_id=$1 AND provider='openai'",[guild]);
+    await db.pool.query("UPDATE provider_configs SET model_id='gemini-3.5-flash-lite',daily_allowance=1050624 WHERE guild_id=$1 AND provider='google'",[guild]);
+    await db.pool.query(`INSERT INTO daily_usage(guild_id,provider,utc_date,${column}) VALUES($1,'google','2026-11-13',1)`,[guild]);
+    expect((await new PostgresProviderRepository(db).load(guild,now))!.candidates).toEqual([]);
+    expect(await usage.reserveUsage(guild,'google',randomUUID(),1050624,now)).toBeNull();
+    expect((await db.pool.query("SELECT daily_allowance FROM provider_configs WHERE guild_id=$1 AND provider='google'",[guild])).rows[0].daily_allowance).toBe('1050624');
+  });
   it('persists Retry-After and permanent faults, without resetting on allowance/priority edits', async () => {
     await db.pool.query('UPDATE provider_configs SET daily_allowance=1100000 WHERE guild_id=$1',[guild]);
     const store = new PostgresProviderRepository(db),c = (await store.load(guild))!.candidates[0]!;

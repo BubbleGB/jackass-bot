@@ -176,3 +176,9 @@ shortcut must not silently weaken the bound.
 These are local token safeguards, not monetary caps or guarantees about provider billing.
 No live model availability, credential validity, billing, safety response distribution or
 retention was tested. Provider policy may retain data even when API state storage is off.
+
+
+Follow-up: [Google reservation investigation](google-reservation-investigation.md) traces
+both full-window admission sites, separates documented limits from conservative choices,
+examines countTokens guarantees/schema coverage, and records small-allowance regressions.
+A smaller strict reservation was not established; model/API/allowances remain unchanged.
