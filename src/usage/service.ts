@@ -44,11 +44,10 @@ export class UsageService {
       await client.query('UPDATE daily_usage SET reserved_tokens=reserved_tokens-$4,uncertain_tokens=uncertain_tokens-$5+$6,input_tokens=input_tokens+$7,output_tokens=output_tokens+$8,reasoning_tokens=reasoning_tokens+$9,total_tokens=total_tokens+$10 WHERE guild_id=$1 AND provider=$2 AND utc_date=$3',[r.guild_id,r.provider,r.original_date,reserved,uncertain,outcome === 'uncertain' ? r.reserved : '0',u.inputTokens,u.outputTokens,u.reasoningTokens,u.totalTokens]);
       await client.query('UPDATE usage_reservations SET state=$2,known_input=$3,known_output=$4,known_reasoning=$5,known_total=$6,updated_at=now() WHERE id=$1',[id,outcome,outcome === 'known' ? u.inputTokens : null,outcome === 'known' ? u.outputTokens : null,outcome === 'known' ? u.reasoningTokens : null,outcome === 'known' ? u.totalTokens : null]);
       if (outcome === 'known' && BigInt(u.totalTokens) > BigInt(r.reserved)) {
-        // Record actual reported usage even if an upstream contract was violated;
-        // never undercount it or enable another attempt under that configuration.
-        const p = (await client.query('SELECT * FROM provider_configs WHERE guild_id=$1 AND provider=$2',[r.guild_id,r.provider])).rows[0];
-        if (p && r.configuration_key === configurationKey({ ciphertext: p.ciphertext,nonce: p.nonce,keyVersion: p.key_version,modelId: p.model_id,effort: p.effort })) await client.query('INSERT INTO provider_health(guild_id,provider,configuration_revision,configuration_key,failures,blocked,next_retry_at) VALUES($1,$2,$3,$4,1,true,NULL) ON CONFLICT(guild_id,provider) DO UPDATE SET blocked=true,configuration_revision=EXCLUDED.configuration_revision,configuration_key=EXCLUDED.configuration_key,next_retry_at=NULL',[r.guild_id,r.provider,p.revision,configurationKey({ ciphertext: p.ciphertext,nonce: p.nonce,keyVersion: p.key_version,modelId: p.model_id,effort: p.effort })]);
-        await client.query("INSERT INTO operational_errors(guild_id,provider,safe_code,correlation_id) VALUES($1,$2,'accounting_bound_exceeded',$3)",[r.guild_id,r.provider,r.attempt_id]);
+        // Estimates can be low. Record the full actual amount without changing the
+        // allowance or permanently blocking a healthy configuration. Admission checks
+        // include this amount and all other in-flight/uncertain usage.
+        await client.query("INSERT INTO operational_errors(guild_id,provider,safe_code,correlation_id) VALUES($1,$2,'usage_estimate_exceeded',$3)",[r.guild_id,r.provider,r.attempt_id]);
       }
     });
   }

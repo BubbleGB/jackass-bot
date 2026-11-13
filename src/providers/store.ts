@@ -1,4 +1,3 @@
-import { MODELS } from './catalog.js';
 import { createHash } from 'node:crypto';
 import type { Database } from '../db/index.js';
 import type { ProviderId } from '../domain/types.js';
@@ -40,7 +39,7 @@ export class PostgresProviderRepository implements ProviderRepository {
       const settings = (await client.query('SELECT s.* FROM guild_settings s JOIN approved_guilds a USING(guild_id) WHERE s.guild_id=$1 AND s.enabled',[guildId])).rows[0];
       if (!settings) return null;
       const rows = (await client.query('SELECT p.*,h.configuration_key AS health_key,h.failures,h.blocked,h.next_retry_at,d.total_tokens,d.uncertain_tokens,d.reserved_tokens FROM provider_configs p LEFT JOIN provider_health h USING(guild_id,provider) LEFT JOIN daily_usage d ON d.guild_id=p.guild_id AND d.provider=p.provider AND d.utc_date=$2 WHERE p.guild_id=$1 AND p.model_id IS NOT NULL AND p.daily_allowance>0 ORDER BY p.priority',[guildId,now.toISOString().slice(0,10)])).rows.filter(row => {
-        const minimum = settings.max_generation_tokens+(row.provider === 'google' ? MODELS[1].inputLimit : 0);
+        const minimum = settings.max_generation_tokens;
         return BigInt(row.daily_allowance)-BigInt(row.total_tokens ?? 0)-BigInt(row.uncertain_tokens ?? 0)-BigInt(row.reserved_tokens ?? 0) >= BigInt(minimum);
       });
       const candidates: Candidate[] = rows.map(row => {
@@ -59,7 +58,9 @@ export class PostgresProviderRepository implements ProviderRepository {
     await transaction(this.database,async client => {
       await guildLock(client,guildId);
       const row = (await client.query('SELECT * FROM provider_configs WHERE guild_id=$1 AND provider=$2',[guildId,candidate.provider])).rows[0];
-      if (row && configurationKey({ ciphertext: row.ciphertext,nonce: row.nonce,keyVersion: row.key_version,modelId: row.model_id,effort: row.effort }) === candidate.configurationKey) {
+      // Malformed/oversized content is local to this request, not a key/model fault.
+      const requestLocal = ['invalid_input','input_too_large'].includes(error.safeCode);
+      if (row && !requestLocal && configurationKey({ ciphertext: row.ciphertext,nonce: row.nonce,keyVersion: row.key_version,modelId: row.model_id,effort: row.effort }) === candidate.configurationKey) {
         const health = (await client.query('SELECT * FROM provider_health WHERE guild_id=$1 AND provider=$2',[guildId,candidate.provider])).rows[0];
         const failures = Math.min(30,(health?.configuration_key === candidate.configurationKey ? health.failures as number : 0)+1);
         const blocked = ['auth','configuration'].includes(error.category);

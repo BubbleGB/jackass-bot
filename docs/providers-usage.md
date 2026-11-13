@@ -1,4 +1,4 @@
-# Task 3: bounded providers and usage
+# Task 3: provider usage safeguards
 
 Scope: provider contracts, request routing and PostgreSQL accounting only. Application
 startup still validates config and exits. All verification uses mocked HTTP responses
@@ -9,12 +9,36 @@ deployment, context fetching, cooldowns or Discord delivery is implemented in th
 
 The verified two-model catalog and source links are in [compatibility.md](compatibility.md).
 SettingsService now defaults to that catalog while retaining injection for tests. The
-OpenAI adapter uses Responses and exact input counting, including the JSON schema.
-Google uses the current stateless Interactions API with the documented combined output
-cap. It reserves the full documented input ceiling because an exact schema-aware
-Interactions counter was not verified. This is deliberately expensive in temporary
-headroom: Google needs **1,050,624 remaining tokens** at the default output ceiling.
-Known settlement releases unused headroom; insufficient budgets skip the call entirely.
+OpenAI adapter uses Responses and its documented request input counter. A shared body
+builder and parity regression verify that the counter receives model, complete trusted
+instructions, serialized context/history, reasoning effort, tools, truncation setting and
+JSON output format/schema from the actual generation request. Only non-input controls
+`store`, `stream` and `max_output_tokens` are added at generation. OpenAI describes this
+preflight input count as exact, including formatting and schemas; this is a documented
+input-count contract, not an independently measured guarantee about final billing.
+
+Google keeps stateless Interactions. Before generation, its documented model `countTokens`
+facility counts a projection of the actual request: identical system instructions and
+serialized context (all supplied human/own-bot history, IDs and timestamps), plus serialized
+`response_format` including the complete schema as a count-only text part. That proxy
+ensures schema content is tokenized even though native Interactions framing and compiled
+schema representation may differ. It is not sent as extra conversation text at generation.
+The shared generation-body builder prevents projection drift. No remote conversation,
+cache reference or tools add unseen history.
+
+Google reserves `countTokens.totalTokens + max(32, ceil(count * 0.10)) + maxGenerationTokens`.
+The extra 32-token/10% margin is an **engineering estimate**, not a provider guarantee or
+proven input upper bound. The projection itself may overcount or undercount native schema
+handling. The generation cap is the documented hard combined visible/thinking cutoff.
+A fixture count of 120 with a 2,048 generation cap reserves **2,200**, not 1,050,624.
+Malformed/failed counts stop generation rather than substitute a character estimate.
+Existing model/context checks and byte/message/instruction limits remain; the configured
+history token ceiling is implemented by Task 4, not by this change.
+
+Both providers reconcile reported actual usage in full. Daily allowances are **practical
+usage safeguards**, not guaranteed billing caps. Estimation errors and already in-flight
+requests can overshoot them; unknown timeout usage may exceed its retained estimate.
+Neither estimation nor settlement changes the configured allowance.
 
 No SDK automatic retries, tools, searches, media, streaming, remote conversation state,
 previous-response IDs or reasoning summaries are requested. Both stateful APIs explicitly
@@ -62,10 +86,14 @@ bucket. This implements a UTC allowance reset, not a provider-billing reset prom
 
 HTTP errors with valid usage preserve that usage; malformed or partial usage remains
 conservative. A crash leaves its reservation charged. There is no automatic release or
-replay on startup. If actual reported usage exceeds its reservation, record the actual
-value honestly, log a safe accounting-bound error, and block the responsible configuration.
-A late old-key/model result cannot block its replacement. Upstream contract violations
-can exceed an intended allowance; this is not an exact monetary or billing guarantee.
+replay on startup. If reported usage exceeds its reservation, record the entire amount
+and a safe `usage_estimate_exceeded` diagnostic. Do not permanently mark healthy provider
+configuration as faulty for underestimation. Atomic admission includes settled actual
+usage and remaining live/uncertain charges; it stops further calls when funding is exhausted.
+Already admitted requests may still settle and increase the overshoot. Even a later known
+report replacing an uncertain charge can exceed the allowance. Only new UTC-day funding
+or an explicit authorized allowance edit restores exhausted funding; no automatic increase
+occurs. An underestimate below the allowance permits subsequent affordable requests.
 
 `requests` counts admitted generation attempts, including definitive rejected/cancelled
 ones, not token-count HTTP calls or unaffordable preflight attempts. Failed primary and
@@ -102,7 +130,9 @@ fallback. The existing reservation remains conservative if persistence is uncert
 Backoff is persisted per guild/provider. Transient failures start at 30 seconds, double
 up to 15 minutes, and respect longer numeric/date Retry-After or Google RetryInfo delays.
 Recovery is a probe by a future eligible request after the timestamp, not an autonomous
-paid timer. Auth/config faults remain blocked until credentials/model/effort change.
+paid timer. Auth/provider-config faults remain blocked until credentials/model/effort change.
+Request-local `invalid_input` and `input_too_large` errors are recorded safely but do not
+change provider health; an oversized request must not disable subsequent short requests.
 The fingerprint covers encrypted envelope, key version, model and effort: allowance/order
 edits and no-op revision increments cannot reset a fault. A replacement configuration's
 first temporary failure does not inherit an old permanent block.
@@ -118,7 +148,8 @@ No code here sends Discord messages, retries delivery or selects channel history
 The unit fixtures exercise native request/response fields, cached/reasoning accounting,
 explicit silence, incomplete filtering, refusal with/without usage, error redaction,
 RetryInfo, deadlines, bounded fallback and no regeneration after accounting failure.
-Real PostgreSQL tests exercise concurrent admission, duplicate settlement, midnight,
+Real PostgreSQL tests exercise concurrent admission and actual-usage overshoot, small allowances, underestimated input,
+post-settlement exhaustion, duplicate settlement, midnight,
 uncertainty, configuration replacement, persisted backoff, both fallback attempts and
 replay suppression. A fresh review found a content-filter fallback gap and an old-result
 configuration-blocking race; both received failing regressions before fixes. The PR records
@@ -129,13 +160,12 @@ completed records before its seven-day cleanup, and avoid blindly replaying proc
 receipts. Health rows cascade with guild deletion. No cleanup, production migration,
 backup/restore or startup/recovery scheduler is claimed implemented by Task 3.
 
-Limits: Google uses a conservative full-window input reservation; real credentials/model
-access and billing were not probed; Google uses a published stable alias rather than a
-nonexistent dated snapshot. Native CI proves these fixtures and database contracts, not
-provider production acceptance or pricing. No Task 4 implementation has begun.
-
-
-Follow-up: [Google reservation investigation](google-reservation-investigation.md) traces
-both full-window admission sites, separates documented limits from conservative choices,
-examines countTokens guarantees/schema coverage, and records small-allowance regressions.
-A smaller strict reservation was not established; model/API/allowances remain unchanged.
+Limits: Google count projection and margin are estimates, not guaranteed billing bounds.
+OpenAI's documented counter is audited for request parity but no live counter/model or
+billing was probed. Both providers retain conservative estimated timeout charges without
+claiming these cover all possible billed usage. Google uses a stable alias that may change.
+Native CI proves fixtures and database contracts, not production API acceptance or pricing.
+Queues, the global worker limit and singleton enforcement still belong to Task 5; Task 3
+retains atomic cross-request ledger admission and bounded attempts/fallback. No Task 4 work
+has begun. [Reservation design/evidence](google-reservation-investigation.md) records the
+superseded full-window behavior and revised short-request examples.

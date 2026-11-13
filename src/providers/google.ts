@@ -1,20 +1,27 @@
+import { model } from './catalog.js';
 import type { GenerationInput,GenerationResult,NormalizedUsage } from '../domain/types.js';
 import { payload,RESPONSE_SCHEMA,REFUSAL,UNKNOWN_USAGE,normalized,output,safety,type ProviderAdapter } from './common.js';
 import { ProviderFailure,assertHttp,fetchTransport,record,send,tokens,type HttpTransport } from './http.js';
 export class GoogleAdapter implements ProviderAdapter {
   readonly provider = 'google' as const;
   constructor(private readonly transport: HttpTransport = fetchTransport) {}
-  async estimateUsage(input: GenerationInput,_credential: string,_signal: AbortSignal): Promise<number> {
-    void _credential;
-    if (_signal.aborted) throw new ProviderFailure('transient','cancelled_before_send',{ notSent: true });
-    payload(this.provider,input);
-    // No verified Interactions-aware schema counter. Reserve the entire documented
-    // input ceiling instead of pretending a generateContent count is exact here.
-    return 1048576+input.maxGenerationTokens;
+  private body(input: GenerationInput) {
+    const p = payload(this.provider,input);
+    return { model: input.modelId,input: p.context,system_instruction: p.instruction,store: false,stream: false,background: false,tools: [],generation_config: { thinking_level: p.effort,thinking_summaries: 'none',max_output_tokens: input.maxGenerationTokens },response_format: { type: 'text',mime_type: 'application/json',schema: RESPONSE_SCHEMA } };
+  }
+  async estimateUsage(input: GenerationInput,credential: string,signal: AbortSignal): Promise<number> {
+    const body = this.body(input);
+    // Documented Gemini tokenizer; Interactions framing/schema compilation may differ.
+    // Count all supplied instructions/history plus a serialized format/schema proxy.
+    // The margin is an engineering estimate, NOT a guaranteed input upper bound.
+    const r = await send(this.transport,{ url: `https://generativelanguage.googleapis.com/v1beta/models/${input.modelId}:countTokens`,headers: { 'x-goog-api-key': credential },body: { generateContentRequest: { model: `models/${input.modelId}`,systemInstruction: { parts: [{ text: body.system_instruction }] },contents: [{ role: 'user',parts: [{ text: body.input },{ text: JSON.stringify(body.response_format) }] }] } },signal });
+    assertHttp(r);
+    const count = tokens(record(r.body).totalTokens),estimatedInput = count+Math.max(32,Math.ceil(count*0.10));
+    if (!Number.isSafeInteger(estimatedInput) || estimatedInput+input.maxGenerationTokens > model(this.provider,input).inputLimit) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
+    return estimatedInput+input.maxGenerationTokens;
   }
   async generate(input: GenerationInput,credential: string,signal: AbortSignal): Promise<GenerationResult> {
-    const p = payload(this.provider,input);
-    const r = await send(this.transport,{ url: 'https://generativelanguage.googleapis.com/v1beta/interactions',headers: { 'x-goog-api-key': credential },body: { model: input.modelId,input: p.context,system_instruction: p.instruction,store: false,stream: false,background: false,tools: [],generation_config: { thinking_level: p.effort,thinking_summaries: 'none',max_output_tokens: input.maxGenerationTokens },response_format: { type: 'text',mime_type: 'application/json',schema: RESPONSE_SCHEMA } },signal });
+    const r = await send(this.transport,{ url: 'https://generativelanguage.googleapis.com/v1beta/interactions',headers: { 'x-goog-api-key': credential },body: this.body(input),signal });
     const b = record(r.body),steps = Array.isArray(b.steps) ? b.steps.map(record) : [];
     // Explicit refusals are terminal. Unknown native rejections also stop fallback;
     // documented HTTP/availability failures retain ordinary bounded fallback.

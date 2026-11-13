@@ -12,8 +12,10 @@ These services are not yet wired to live Discord or HTTP routes.
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
 The Oracle ARM64 VPS remains an eventual deployment target; it is not a test database.
-The original handoff is preserved verbatim, so its Termux paths and progress record
-are historical. See [recovery and verification](docs/task-1-verification.md) and
+The handoff includes the user’s revised allowance policy; its Termux paths and original
+progress record are historical. Daily token allowances are practical safeguards, not hard
+billing caps: estimation error and in-flight calls can overshoot them. Both providers use
+request-based preflight counts and reconcile full reported usage; allowances never increase automatically. See [recovery and verification](docs/task-1-verification.md) and
 [version compatibility](docs/compatibility.md).
 
 ### Install and check

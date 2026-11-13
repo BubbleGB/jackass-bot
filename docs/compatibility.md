@@ -110,7 +110,7 @@ was performed. See [settings/access contracts](settings-access.md) for wiring re
 ## Task 3 official provider contracts — checked 13 November 2026
 
 No SDK dependency was added. Explicit HTTP uses pinned Node 26.13.1 native fetch and
-AbortSignal; each adapter sends one request, without SDK automatic retry/replay. All
+AbortSignal; preflight counting and generation are separate single requests, without SDK automatic retry/replay. All
 inference/token-count tests use injected HTTP fixtures, never live credentials or paid
 API calls. Documentation and the public Google REST discovery schema were read only.
 
@@ -139,7 +139,9 @@ Official sources read:
   [official generated request types](https://github.com/openai/openai-node/blob/master/src/resources/responses/input-tokens.ts)
   confirm POST `/v1/responses/input_tokens` accepts `model`, `instructions`, `input`,
   `reasoning`, `text.format`, `tools` and disabled truncation. Counting and generation
-  share the same deterministic input/schema payload. This is not a characters/4 estimate.
+  share the same deterministic input/schema payload. A parity regression compares every
+  field, allowing only store/stream/max_output_tokens on generation. This audits the
+  documented exact input-count claim, not final billing or a universal hard daily cap.
 - [Gemini model card](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)
   and [model changes](https://ai.google.dev/gemini-api/docs/whats-new-gemini-3.6):
   selected stable code, limits, structured output and absence of sampling overrides.
@@ -151,9 +153,11 @@ Official sources read:
 - [Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output):
   `response_format:{type:'text',mime_type:'application/json',schema:...}`.
 - [Token guide](https://ai.google.dev/gemini-api/docs/tokens) and
-  [countTokens reference](https://ai.google.dev/api/tokens): counting APIs exist, but
-  an exact Interactions request including its schema was not verified. The legacy
-  generateContent counter is not represented as an exact counter for a different API.
+  [countTokens reference](https://ai.google.dev/api/tokens): the documented model counter accepts a generateContentRequest projection. We count
+  actual system instructions and serialized history, plus serialized output format/schema
+  as a count-only text part. This is a native tokenizer estimate for Interactions, not
+  an exact native framing/schema count. See also the
+  [Interactions token guide](https://ai.google.dev/gemini-api/docs/interactions/tokens).
 - [Legacy usage definitions](https://ai.google.dev/api/generate-content):
   `promptTokenCount` includes cache and total includes prompt/candidates/thoughts. The
   chosen Interactions adapter uses the current `usage.total_*` fields instead; fixtures
@@ -165,20 +169,21 @@ For OpenAI, cached input is already included in `input_tokens`; reasoning is alr
 reported total must equal input + normalized output; cached tokens are not added again.
 Unknown/missing/inconsistent usage is retained as uncertain, not interpreted as free.
 
-**Google reservation limitation:** before each generation, reserve 1,048,576 input tokens
-plus the configured combined output ceiling. This deliberately conservative bound avoids
-claiming an exact schema count that was not verified. At the default 2,048 ceiling, Google
-needs 1,050,624 tokens of remaining daily headroom to start a call. Actual known usage
-releases the excess afterward. Smaller allowances skip Google without a provider call.
-Adding a proven Interactions-aware counter can improve this later; an unsupported counting
-shortcut must not silently weaken the bound.
+**Revised reservation policy:** the user explicitly superseded the prior requirement to
+reject models without guaranteed accounting bounds. Keep both models. Google now reserves
+its actual-request projection count plus `max(32, ceil(count * 0.10))` input margin plus
+the configured total generation cap. The margin is an engineering estimate, not a guaranteed
+upper bound. With mocked count 120 and generation cap 2,048 the reservation is 2,200.
+OpenAI reserves its documented full-request count plus the same enforced generation cap;
+no extra engineering margin is currently applied to OpenAI.
 
-These are local token safeguards, not monetary caps or guarantees about provider billing.
+All reported actual usage is recorded, even above the reservation. Atomic reservations
+prevent admitting estimates beyond remaining funding, but estimation and already in-flight
+requests can overshoot the daily allowance. Further calls stop when known, uncertain and
+reserved usage exhaust funding. Uncertain timeouts retain the estimated charge, which is
+not a guarantee of the billed maximum. No configured allowance is automatically increased.
+These are local usage safeguards, not hard billing caps or monetary estimates.
+
 No live model availability, credential validity, billing, safety response distribution or
 retention was tested. Provider policy may retain data even when API state storage is off.
-
-
-Follow-up: [Google reservation investigation](google-reservation-investigation.md) traces
-both full-window admission sites, separates documented limits from conservative choices,
-examines countTokens guarantees/schema coverage, and records small-allowance regressions.
-A smaller strict reservation was not established; model/API/allowances remain unchanged.
+See [reservation evidence and short-request examples](google-reservation-investigation.md).

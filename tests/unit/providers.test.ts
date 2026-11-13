@@ -22,21 +22,41 @@ describe('curated model contracts and provider fixtures', () => {
     const b = await new GoogleAdapter(transport(googleResponse())).generate({ ...input,modelId: 'gemini-3.5-flash-lite' },'fake-key',signal());
     for (const result of [a,b]) expect(result).toEqual({ kind: 'answer',text: 'Hello',usage: { inputTokens: 100,outputTokens: 30,reasoningTokens: 20,totalTokens: 130,certainty: 'reported' } });
   });
-  it('counts the exact OpenAI request including schema before reserving output', async () => {
+  it('counts all token-bearing OpenAI generation fields using the same request body', async () => {
     const calls: Parameters<HttpTransport>[0][] = [];
     const adapter = new OpenAIAdapter(async request => { calls.push(request); return { status: 200,headers: {},body: request.url.endsWith('/input_tokens') ? { input_tokens: 100 } : openResponse() }; });
     expect(await adapter.estimateUsage(input,'fake-key',signal())).toBe(2148);
     await adapter.generate(input,'fake-key',signal());
-    expect(calls[0]?.body.text).toEqual(calls[1]?.body.text);
-    expect(calls[0]?.body.input).toEqual(calls[1]?.body.input);
+    const { store,stream,max_output_tokens,...counted } = calls[1]!.body;
+    expect({ store,stream,max_output_tokens }).toEqual({ store: false,stream: false,max_output_tokens: 2048 });
+    expect(calls[0]!.body).toEqual(counted);
+    expect(counted).toMatchObject({ model: input.modelId,instructions: expect.stringContaining('Be kind.'),input: [{ role: 'user',content: JSON.stringify(input.context) }],reasoning: { effort: 'low' },tools: [],truncation: 'disabled',text: { format: { type: 'json_schema',strict: true,schema: { required: ['kind','text'] } } } });
     expect(calls[1]?.body).toMatchObject({ store: false,tools: [],max_output_tokens: 2048,truncation: 'disabled' });
     expect(JSON.stringify(calls[1]?.body)).not.toContain('fake-key');
   });
-  it('uses the documented conservative Google input ceiling without a mismatched count request', async () => {
-    let calls = 0;
-    const a = new GoogleAdapter(async () => { calls++; return { status: 200,headers: {},body: googleResponse() }; });
-    expect(await a.estimateUsage({ ...input,modelId: 'gemini-3.5-flash-lite' },'fake-key',signal())).toBe(1048576+2048);
-    expect(calls).toBe(0);
+  it('counts Google instructions, serialized history and schema projection, then adds an estimated margin and generation cap', async () => {
+    const calls: Parameters<HttpTransport>[0][] = [];
+    const a = new GoogleAdapter(async r => { calls.push(r); return { status: 200,headers: {},body: r.url.endsWith(':countTokens') ? { totalTokens: 120 } : googleResponse() }; });
+    const googleInput = { ...input,modelId: 'gemini-3.5-flash-lite' };
+    expect(await a.estimateUsage(googleInput,'fake-key',signal())).toBe(2200);
+    await a.generate(googleInput,'fake-key',signal());
+    expect(calls[0]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:countTokens');
+    const generation = calls[1]!.body;
+    const projection = calls[0]!.body.generateContentRequest as { model: string; systemInstruction: { parts: { text: string }[] }; contents: { role: string; parts: { text: string }[] }[] };
+    expect(projection.model).toBe('models/gemini-3.5-flash-lite');
+    expect(projection.systemInstruction.parts).toEqual([{ text: generation.system_instruction }]);
+    expect(generation.system_instruction).toContain('Be kind.');
+    expect(projection.contents[0]!.role).toBe('user');
+    expect(projection.contents[0]!.parts[0]!.text).toBe(generation.input);
+    expect(generation.input).toBe(JSON.stringify(input.context));
+    expect(JSON.parse(projection.contents[0]!.parts[1]!.text)).toEqual(generation.response_format);
+    expect(generation).toMatchObject({ generation_config: { max_output_tokens: 2048,thinking_level: 'low' },tools: [],store: false });
+    expect(JSON.stringify(calls.map(r => r.body))).not.toContain('fake-key');
+  });
+  it('scales the Google engineering margin and rejects missing or out-of-context counts', async () => {
+    const googleInput = { ...input,modelId: 'gemini-3.5-flash-lite' };
+    expect(await new GoogleAdapter(transport({ totalTokens: 1000 })).estimateUsage(googleInput,'fake-key',signal())).toBe(3148);
+    for (const body of [{},{ totalTokens: -1 },{ totalTokens: 1048576 }]) await expect(new GoogleAdapter(transport(body)).estimateUsage(googleInput,'fake-key',signal())).rejects.toThrow();
   });
   it('requires explicit structured silence, distinguishing empty transport output', async () => {
     expect((await new OpenAIAdapter(transport(openResponse('{"kind":"silence","text":""}'))).generate(input,'fake-key',signal())).kind).toBe('silence');
