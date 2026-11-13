@@ -105,3 +105,74 @@ for the current user's member endpoint, but this implementation uses individual
 bot-authenticated member lookups and never treats OAuth guild lists as current proof.
 Fresh transport responses are required on protected operations. No live Discord lookup
 was performed. See [settings/access contracts](settings-access.md) for wiring requirements.
+
+
+## Task 3 official provider contracts — checked 13 November 2026
+
+No SDK dependency was added. Explicit HTTP uses pinned Node 26.13.1 native fetch and
+AbortSignal; each adapter sends one request, without SDK automatic retry/replay. All
+inference/token-count tests use injected HTTP fixtures, never live credentials or paid
+API calls. Documentation and the public Google REST discovery schema were read only.
+
+The small catalog is in `src/providers/catalog.ts`:
+
+| Provider / API | Selected model | Allowed effort | Documented limits |
+| --- | --- | --- | --- |
+| OpenAI Responses | `gpt-5.4-mini-2026-03-17` | none, low, medium, high, xhigh | 400,000 context, 128,000 output |
+| Google Gemini Interactions v1beta | `gemini-3.5-flash-lite` | minimal, low, medium, high | 1,048,576 input/context, 65,536 output |
+
+OpenAI is pinned to the published snapshot. Google publishes this stable model code;
+we did not invent a dated snapshot. Its alias may change upstream and must be rechecked
+on future catalog updates. GPT-5 mini's older dated snapshot is marked deprecated;
+Google 2.5 docs restrict new-project access. Neither was selected for this new project.
+No moving `latest` alias, external tool, search, attachment or media capability is enabled.
+
+Official sources read:
+
+- [OpenAI model card](https://developers.openai.com/api/docs/models/gpt-5.4-mini): exact
+  snapshot, supported reasoning efforts, structured-output capability and context/output limits.
+- [Reasoning guide](https://developers.openai.com/api/docs/guides/reasoning):
+  `max_output_tokens` includes reasoning, visible output and non-visible formatting;
+  output reasoning is a breakdown of `output_tokens`, not an additional charge.
+- [Token-count guide](https://developers.openai.com/api/docs/guides/token-counting):
+  exact input count for the model, including instructions/tools/schemas. The
+  [official generated request types](https://github.com/openai/openai-node/blob/master/src/resources/responses/input-tokens.ts)
+  confirm POST `/v1/responses/input_tokens` accepts `model`, `instructions`, `input`,
+  `reasoning`, `text.format`, `tools` and disabled truncation. Counting and generation
+  share the same deterministic input/schema payload. This is not a characters/4 estimate.
+- [Gemini model card](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)
+  and [model changes](https://ai.google.dev/gemini-api/docs/whats-new-gemini-3.6):
+  selected stable code, limits, structured output and absence of sampling overrides.
+- [Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking): model-specific
+  levels and the Interactions `max_output_tokens` hard combined thought/output cutoff.
+- [Interactions guide](https://ai.google.dev/gemini-api/docs/interactions) and
+  [API reference](https://ai.google.dev/api/interactions-api): stateless `store:false`,
+  `generation_config`, usage fields and current API representation.
+- [Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output):
+  `response_format:{type:'text',mime_type:'application/json',schema:...}`.
+- [Token guide](https://ai.google.dev/gemini-api/docs/tokens) and
+  [countTokens reference](https://ai.google.dev/api/tokens): counting APIs exist, but
+  an exact Interactions request including its schema was not verified. The legacy
+  generateContent counter is not represented as an exact counter for a different API.
+- [Legacy usage definitions](https://ai.google.dev/api/generate-content):
+  `promptTokenCount` includes cache and total includes prompt/candidates/thoughts. The
+  chosen Interactions adapter uses the current `usage.total_*` fields instead; fixtures
+  follow those definitions. Legacy and current payload shapes are not interchanged.
+
+For OpenAI, cached input is already included in `input_tokens`; reasoning is already in
+`output_tokens`. For Google Interactions, `total_output_tokens` is visible output and
+`total_thought_tokens` is separate. Normalized output is their sum. In both adapters,
+reported total must equal input + normalized output; cached tokens are not added again.
+Unknown/missing/inconsistent usage is retained as uncertain, not interpreted as free.
+
+**Google reservation limitation:** before each generation, reserve 1,048,576 input tokens
+plus the configured combined output ceiling. This deliberately conservative bound avoids
+claiming an exact schema count that was not verified. At the default 2,048 ceiling, Google
+needs 1,050,624 tokens of remaining daily headroom to start a call. Actual known usage
+releases the excess afterward. Smaller allowances skip Google without a provider call.
+Adding a proven Interactions-aware counter can improve this later; an unsupported counting
+shortcut must not silently weaken the bound.
+
+These are local token safeguards, not monetary caps or guarantees about provider billing.
+No live model availability, credential validity, billing, safety response distribution or
+retention was tested. Provider policy may retain data even when API state storage is off.
