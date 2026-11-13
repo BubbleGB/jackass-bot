@@ -1,0 +1,2 @@
+ALTER TABLE "audit_events" ADD COLUMN "target_guild_id" text;--> statement-breakpoint
+ALTER TABLE "audit_events" ADD CONSTRAINT "audit_target_snowflake" CHECK ("audit_events"."target_guild_id" IS NULL OR "audit_events"."target_guild_id" ~ '^[0-9]{17,20}$');

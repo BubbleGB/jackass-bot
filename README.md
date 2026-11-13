@@ -2,11 +2,12 @@
 bot for aa
 
 
-## Galaxy Neegy — Task 1 foundation
+## Galaxy Neegy — settings and access foundation
 
-A recovered TypeScript foundation for the approved [handoff](docs/galaxy-neegy-handoff.md).
-The current program validates configuration and exits. Discord, AI calls, HTTP routes,
-authorisation and the dashboard are not implemented yet.
+A TypeScript foundation recovered from the phone and extended through Task 2 of the approved [handoff](docs/galaxy-neegy-handoff.md).
+The current program validates configuration and exits. Discord startup, AI calls, HTTP routes and the dashboard are not implemented yet.
+Task 2 adds backend access/settings/credential services; see [their contracts and security
+boundaries](docs/settings-access.md).
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
 The Oracle ARM64 VPS remains an eventual deployment target; it is not a test database.
@@ -74,14 +75,14 @@ only through the explicit command; application startup does not run them.
 fields. Copy it to a local `.env` only if needed; real `.env` files are ignored.
 Runtime mode requires a PostgreSQL URL, HTTPS public origin in production, a canonical
 base64 32-byte encryption key, Discord bot/OAuth credentials and creator snowflake.
-Config errors contain field names, never supplied values. Encryption itself belongs
-to Task 2; no provider keys are accepted by this foundation.
+Config errors contain field names, never supplied values. Task 2 provides authenticated provider-key storage through the service layer;
+no web key-entry endpoint or live provider worker exists yet.
 
 The read-only [checks workflow](.github/workflows/checks.yml) installs from the lockfile,
 runs lint/typecheck/unit/build/database checks, checks migration drift and smoke-tests
 foundation startup on native AMD64 and ARM64 Linux runners. It uses a fresh PostgreSQL
-service and no deployment secrets. Workflow execution remains unverified until an
-explicitly authorised push triggers GitHub Actions.
+service and no deployment secrets. Task 1 passed both architectures before PR #1 was squash-merged.
+Task 2 CI results are recorded in its PR; local checks alone never establish remote success.
 
 `npm run test:e2e` is reserved for Task 7. No browser scenarios exist yet, so it is not
 part of Task 1 CI and must not be reported as passing. No image publication or deployment
@@ -89,5 +90,5 @@ workflow is present.
 
 Pending later inputs include application/creator/guild IDs, credentials through secret
 storage, contact link, the original mascot logo, registry access and an encrypted off-VPS
-backup destination. None is needed to run Task 1 checks. Stop after Task 1; Task 2 and VPS
-access require further instruction.
+backup destination. None is needed to run Task 1 checks. Task 2 is the current boundary. Leave its PR unmerged; Task 3, VPS
+access and deployment require further instruction.

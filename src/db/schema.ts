@@ -27,12 +27,12 @@ export const guildSettings = pgTable('guild_settings', {
 ]);
 export const providerConfigs = pgTable('provider_configs', {
   guildId: guildId(), provider: provider(), ciphertext: bytea('ciphertext').notNull(), nonce: bytea('nonce').notNull(),
-  keyVersion: integer('key_version').notNull(), modelId: text('model_id').notNull(), effort: text('effort'),
+  keyVersion: integer('key_version').notNull(), modelId: text('model_id'), effort: text('effort'),
   priority: integer('priority').notNull(), dailyAllowance: counter('daily_allowance'), revision: integer('revision').default(1).notNull(),
   createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
 }, (t) => [
   primaryKey({ columns: [t.guildId, t.provider] }), unique('provider_priority_unique').on(t.guildId, t.priority),
-  check('provider_config_bounds', sql`${t.provider} IN ('openai','google') AND ${t.priority} BETWEEN 1 AND 2 AND ${t.dailyAllowance} >= 0 AND ${t.revision} > 0 AND ${t.keyVersion} > 0 AND length(${t.modelId}) BETWEEN 1 AND 200 AND octet_length(${t.nonce}) = 12 AND octet_length(${t.ciphertext}) > 16`),
+  check('provider_config_bounds', sql`${t.provider} IN ('openai','google') AND ${t.priority} BETWEEN 1 AND 2 AND ${t.dailyAllowance} >= 0 AND ${t.revision} > 0 AND ${t.keyVersion} > 0 AND (${t.modelId} IS NULL OR length(${t.modelId}) BETWEEN 1 AND 200) AND octet_length(${t.nonce}) = 12 AND octet_length(${t.ciphertext}) > 16`),
 ]);
 export const autoChannels = pgTable('auto_channels', {
   guildId: guildId(), channelId: text('channel_id').notNull(),
@@ -79,8 +79,9 @@ export const webSessions = pgTable('web_sessions', {
 ]);
 export const auditEvents = pgTable('audit_events', {
   id: uuid('id').defaultRandom().primaryKey(), guildId: text('guild_id').references(() => guildSettings.guildId, { onDelete: 'cascade' }),
+  targetGuildId: text('target_guild_id'),
   actor: text('actor').notNull(), action: text('action').notNull(), changedFields: text('changed_fields').array().notNull().default(sql`ARRAY[]::text[]`), createdAt: createdAt(),
-}, (t) => [index('audit_guild_created').on(t.guildId,t.createdAt)]);
+}, (t) => [check('audit_target_snowflake', sql`${t.targetGuildId} IS NULL OR ${t.targetGuildId} ~ '^[0-9]{17,20}$'`), index('audit_guild_created').on(t.guildId,t.createdAt)]);
 export const operationalErrors = pgTable('operational_errors', {
   id: uuid('id').defaultRandom().primaryKey(), guildId: guildId(), provider: provider(), safeCode: text('safe_code').notNull(), correlationId: uuid('correlation_id').notNull(), createdAt: createdAt(),
 }, (t) => [check('operational_safe_code', sql`${t.provider} IN ('openai','google') AND ${t.safeCode} ~ '^[a-z0-9_]{1,64}$'`), index('errors_guild_created').on(t.guildId,t.createdAt)]);

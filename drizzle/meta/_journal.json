@@ -8,6 +8,20 @@
       "when": 1794587963637,
       "tag": "0000_puzzling_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794600855188,
+      "tag": "0001_mysterious_spencer_smythe",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794601026082,
+      "tag": "0002_colossal_jackpot",
+      "breakpoints": true
     }
   ]
 }
