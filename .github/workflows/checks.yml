@@ -1,0 +1,57 @@
+name: Task 1 checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.7-bookworm@sha256:ece55f7868da684e400f82f1030a050718adbdd65c23aa500c486f6e2950dc0f
+        env:
+          POSTGRES_USER: galaxy_test
+          POSTGRES_PASSWORD: galaxy_test
+          POSTGRES_DB: galaxy_neegy_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U galaxy_test -d galaxy_neegy_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      NODE_ENV: test
+      APP_MODE: foundation
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Verify exact runtime and package manager
+        run: |
+          test "$(node --version)" = "v26.13.1"
+          test "$(npm --version)" = "11.20.0"
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://galaxy_test:galaxy_test@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/galaxy_neegy_test
+      - name: Verify migration snapshot consistency
+        run: |
+          npm run db:generate
+          test -z "$(git status --porcelain -- drizzle/)"
+      - name: Foundation startup smoke check (no live services)
+        run: npm start
+      # Browser scenarios arrive in Task 7; an empty suite is not a passing check.

@@ -1,0 +1,89 @@
+# Task 1 compatibility evidence
+
+Checked 13 November 2026 in Codex Cloud. Exact direct dependency versions were recovered
+from the phone and retained after querying the official npm registry version endpoints.
+`npm ci --ignore-scripts`, `npm ls --depth=0` and the checks in
+[task-1-verification.md](task-1-verification.md) verify the installed combination.
+No provider SDK or model selection is made in Task 1.
+
+## Runtime and database
+
+- Node **26.13.1**, Lithium LTS; npm **11.20.0** bundled with that release.
+  [Official release index](https://nodejs.org/dist/index.json) lists the release dated
+  10 November 2026, `lts: Lithium`, and Linux x64/ARM64 binaries.
+  [Official release schedule](https://github.com/nodejs/Release/blob/main/schedule.json)
+  lists Node 26 LTS starting 28 October 2026 and end of support 30 April 2029.
+  The Cloud x64 archive was checked against the release's
+  [SHA256 list](https://nodejs.org/dist/v26.13.1/SHASUMS256.txt):
+  `5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864`.
+- PostgreSQL **18.7**, Debian bookworm, multiarch image index
+  `postgres:18.7-bookworm@sha256:ece55f7868da684e400f82f1030a050718adbdd65c23aa500c486f6e2950dc0f`.
+  [Official image manifest source](https://github.com/docker-library/official-images/blob/master/library/postgres)
+  lists amd64 and arm64v8. Docker's registry manifest confirms both platforms in this
+  immutable digest. The running Cloud instance reports PostgreSQL 18.7 on x86_64.
+  [PostgreSQL source version](https://github.com/postgres/postgres/blob/REL_18_STABLE/configure.ac)
+  also reports 18.7. The PostgreSQL versioning website returned HTTP 503 during this check;
+  no claim relies on that failed request.
+- [Drizzle PostgreSQL setup documentation source](https://github.com/drizzle-team/drizzle-orm-docs/blob/main/src/content/docs/pg/get-started-postgresql.mdx)
+  describes the node-postgres driver and migration workflow. The public documentation
+  site returned HTTP 403; the official source was read instead. The pinned ORM accepts
+  `pg >=8`; our SQL migrations and driver have run against the pinned PostgreSQL image.
+
+## Exact npm versions
+
+Each version link is the registry metadata endpoint checked in this session.
+
+| Package | Pin | Compatibility evidence |
+| --- | --- | --- |
+| [drizzle-orm](https://registry.npmjs.org/drizzle-orm/0.45.4) | 0.45.4 | node-postgres peer `pg >=8` |
+| [pg](https://registry.npmjs.org/pg/8.23.1) | 8.23.1 | Node >=16 |
+| [drizzle-kit](https://registry.npmjs.org/drizzle-kit/0.31.11) | 0.31.11 | Offline generation ran; no schema drift |
+| [TypeScript](https://registry.npmjs.org/typescript/6.0.3) | 6.0.3 | Node >=14.17; NodeNext build/typecheck ran |
+| [ESLint](https://registry.npmjs.org/eslint/10.14.0) | 10.14.0 | Node ^20.19 / ^22.13 / >=24 |
+| [@eslint/js](https://registry.npmjs.org/@eslint/js/10.0.1) | 10.0.1 | ESLint ^10 |
+| [typescript-eslint](https://registry.npmjs.org/typescript-eslint/8.72.2) | 8.72.2 | ESLint ^8.57 / ^9 / ^10; TS >=4.8.4 <6.1 |
+| [Vitest](https://registry.npmjs.org/vitest/5.1.0) | 5.1.0 | Node ^22.12 / ^24 / >=26; real tests ran |
+| [Playwright](https://registry.npmjs.org/@playwright/test/1.65.0) | 1.65.0 | Node >=20; browser scenarios deferred to Task 7 |
+| [@types/node](https://registry.npmjs.org/@types/node/26.6.6) | 26.6.6 | Node 26 types; compiler checks ran |
+| [@types/pg](https://registry.npmjs.org/@types/pg/8.23.1) | 8.23.1 | Compiler checks ran with pg 8.23.1 |
+
+All transitive resolutions and integrity hashes remain in the recovered lockfile.
+The recovered overrides pin minimatch 11.0.1 and the legacy esbuild-kit subtree's esbuild
+0.25.12. They were retained after a clean install, lint, migration generation and audit.
+Drizzle Kit still brings deprecated `@esbuild-kit/esm-loader` and `core-utils`; npm
+warns about these, but the checked registry audit reports zero vulnerabilities.
+Do not use `npm audit fix --force` to change this tested dependency graph blindly.
+
+## CI and architecture limits
+
+The workflow pins `actions/checkout` v6 to
+`d23441a48e516b6c34aea4fa41551a30e30af803` and `actions/setup-node` v6 to
+`249970729cb0ef3589644e2896645e5dc5ba9c38`, resolved from their official GitHub tag refs.
+It selects the exact Node version from `.node-version` and checks bundled npm explicitly.
+The PostgreSQL service uses the same multiarch digest as Cloud Compose.
+
+Cloud verification here is **Linux AMD64**. Native ARM64 CI is configured on
+`ubuntu-24.04-arm`, but has not run because no push was authorised. Metadata confirms
+ARM64 availability; it does not establish a successful ARM64 build. Task 8 still owns
+building/testing the application ARM64 image and operational packaging.
+
+## Official API documentation checked; implementation deferred
+
+No Discord or provider endpoints were called and no production credentials were used.
+These official documentation sources were read for the future integration boundaries:
+
+- Discord [gateway](https://github.com/discord/discord-api-docs/blob/main/developers/events/gateway.mdx),
+  [OAuth2](https://github.com/discord/discord-api-docs/blob/main/developers/topics/oauth2.mdx),
+  [channel types](https://github.com/discord/discord-api-docs/blob/main/developers/resources/channel.mdx),
+  and [guild/member REST](https://github.com/discord/discord-api-docs/blob/main/developers/resources/guild.mdx).
+  Official hosted docs returned HTTP 403; their maintained source was read instead.
+  Gateway and OAuth/member authorisation still require task-specific verification in
+  Tasks 2, 6 and 7; no privileged member/presence intent is enabled by this foundation.
+- OpenAI [Node SDK API surface](https://github.com/openai/openai-node/blob/master/api.md)
+  confirms the Responses API exists. The hosted API reference returned HTTP 403.
+- Google [Gemini API documentation](https://ai.google.dev/gemini-api/docs) was accessible.
+
+Exact Discord/Fastify/React/Vite/OpenAI/Google SDK pins, supported model IDs, effort values,
+reasoning/cached-token accounting and model ceilings must be verified when those packages
+are introduced. No claim is made that a concrete model or billing boundary has been
+validated in Task 1. Recheck current official sources during those tasks.
