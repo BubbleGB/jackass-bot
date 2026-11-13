@@ -1,0 +1,21 @@
+# Local tests only. No bot, provider calls, or deployment services.
+name: galaxy-neegy-dev
+services:
+  postgres:
+    image: postgres:18.7-bookworm@sha256:ece55f7868da684e400f82f1030a050718adbdd65c23aa500c486f6e2950dc0f
+    environment:
+      POSTGRES_USER: galaxy_test
+      POSTGRES_PASSWORD: galaxy_test
+      POSTGRES_DB: galaxy_neegy_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    # Disposable database: no production or persistent volume.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galaxy_test -d galaxy_neegy_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
