@@ -16,7 +16,9 @@ with those services and `ProviderRouter`. Do not substitute user-only tokenizati
 character estimates for this complete-request counter. Keys remain within providers.
 
 `handleDirect(request)` returns an accepted answer/silence/refusal or an eligibility
-status; it does not deliver Discord messages. `acceptDirect(request, now?)` returns
+status. Oversized required input returns the typed
+`{status:'input_too_large', message:string}` user-safe result; it never generates a shorter
+version of the request. It does not deliver Discord messages. `acceptDirect(request, now?)` returns
 accepted/cooldown/disabled/unsupported/busy. The caller obtains all event IDs and identities
 from authenticated Discord events/interactions, never a user-supplied identity field.
 For mention/reply, request.id is the original message snowflake; for ask it is the
@@ -62,24 +64,52 @@ permissions, stored chat, linked page, attachment or media downloads are used.
   Keep this bot's own text under the independent self cap. Content is chronological,
   deduplicated by message ID and ends at the triggering message. Ask snapshots end at
   request.receivedAt. Fresh trigger content replaces duplicate history copies.
-- The current trigger or synthetic `ask:<interactionId>` prompt occupies one human slot;
-  all human context stays within humanContextLimit, and self stays within selfContextLimit.
-  With humanContextLimit=0, direct context fails closed: enable at least one human slot to
-  include the required request. No cap or allowance is silently raised.
+- Human/self caps apply to **previous history only**. The intact current mention/reply
+  or synthetic `ask:<interactionId>` prompt is required input, separate from history caps,
+  and appears exactly once. humanContextLimit=0 disables previous human history while
+  allowing direct requests; selfContextLimit remains independent. With both history caps
+  zero, no history pages are fetched. Maximum direct context is 100 human history + 20
+  own-bot history + one current request, or 121 messages. Automatic context remains 120.
 - Count all actual supplied instructions, structured untrusted history and schema using
   each eligible funded selected model's Task 3 input estimator. The entire estimated input
   (including Google's engineering margin) must fit contextTokenLimit, and input + total
   generation ceiling must fit the catalog's existing conservative context check. Unknown
   models/incompatible settings are rejected. Failed/unavailable provider preflights update
   health and may leave another eligible model; safety/unknown rejection is terminal.
-- Drop oldest optional history first, keeping newer content, then binary fit the required
-  message's counted fitting Unicode-code-point suffix. Never duplicate the required ID;
-  if even one code point plus framing cannot fit, reject without generation. The tokenizer
-  is not assumed universally monotone; every returned candidate itself passed its count.
+- Preserve **all server instructions and all current direct-request text**, including
+  when history is trimmed. Drop oldest optional messages in whole-message batches,
+  retaining newer history. Never silently shorten instructions or current input. If the
+  intact required input cannot fit contextTokenLimit and the model's configured generation
+  ceiling, reject with `input_too_large` before reservation/generation. Native counting may
+  be used to determine fit; it is not a generation API call. A larger final routing count
+  also produces typed input-too-large if no generation was attempted. If a primary was
+  already sent before a fallback size rejection, normal failure/uncertainty handling
+  remains; it is never labelled as a pre-generation rejection.
 - At most 24 sizing rounds and one 20-second context deadline, including uncooperative
-  injected dependencies. Over-budget bytes are trimmed before provider counting; adapters'
-  existing 1 MB context/8,000 instruction/120 message guards remain. Ask/message text is
-  limited to 6,000 characters. A late timed-out counter cannot start another count.
+  dependencies. Trim optional whole history before retrying over-budget payload bytes;
+  never reduce required input to satisfy the 1 MB context / 8,000 instruction / 6,000
+  current-text character guards. Oversized required content gets the same typed result.
+  A late timed-out counter cannot start another count.
+
+## Automatic context construction (no scheduling)
+
+`buildAutomaticContext(request, settings)` only constructs context; it does not accept,
+queue, schedule or generate automatic requests. Task 5 will supply eligible automatic
+triggers and consume its typed result. Its mode reflects saved autoPolicy, independent
+of the direct switch, and the same current channel/permission checks apply. The current
+human event is ordinary capped conversation context here, not an extra direct prompt.
+
+The result is `{status:'ready', context}` or `{status:'skipped', reason}`. Safe reasons are
+`no_usable_context`, `input_too_large`, `context_check_limit`, and `context_unavailable`. Ignore blank or overlong optional automatic
+rows before counting history slots; retain the newest nonblank human message while
+removing optional older messages/own-bot text. Never send instructions alone or bot-only
+conversation for an assessment. If the newest whole human message cannot fit, try older whole human messages from the
+selected context, newest first. Skip with `input_too_large` only once those choices are
+exhausted; if the 24-round work bound is reached, use `context_check_limit` rather than
+claiming every candidate is too large. Server instructions and generation limits stay
+unchanged throughout. Zero human
+history consequently skips automatic context with `no_usable_context`. This is a nonblank
+text requirement, not a gibberish/language heuristic: greetings and slang still qualify.
 
 Counting may happen more than once while fitting and again at reservation. It does not
 increment generation-attempt counters. Generation still goes exclusively through Task 3's
@@ -100,7 +130,8 @@ them, closing concurrent eligibility races. Other users/guilds are independent.
 context/config/permission error and provider failure. Release is matched to request ID;
 it does not erase the acceptance cooldown. State contains identifiers/times only, with
 10,000 entries maximum and expired idle entries pruned on capacity pressure. It is local
-to one process, so a restart clears this five-second gate. Task 5's singleton/queue guard
+to one process, so a restart clears this five-second gate. The user explicitly accepted
+this behavior for v1; cooldown persistence is not a remaining blocker. Task 5's singleton/queue guard
 is still required before runtime activation. There is no automatic retry or delivery here.
 Future slash handlers must acknowledge cooldown/busy privately; mentions/replies may be
 ignored. Duplicate generation receipts remain Task 3's responsibility; no Task 5 counters

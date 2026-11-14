@@ -3,8 +3,8 @@ import { ProviderFailure } from '../providers/http.js';
 import type { ProviderRouter } from '../providers/router.js';
 import { DirectEligibility,type DirectAcceptance } from './eligibility.js';
 import { ContextBuilder } from './context.js';
-import { ConversationError,contextOperation,type ConversationConfigRepository,type HistorySource } from './types.js';
-export type DirectOutcome = { status: 'accepted'; result: GenerationResult } | { status: Exclude<DirectAcceptance,'accepted'> };
+import { ConversationError,INPUT_TOO_LARGE,contextOperation,type InputTooLargeResult,type ConversationConfigRepository,type HistorySource } from './types.js';
+export type DirectOutcome = { status: 'accepted'; result: GenerationResult } | { status: Exclude<DirectAcceptance,'accepted'> } | InputTooLargeResult;
 export class DirectService {
   constructor(private readonly eligibility: DirectEligibility,private readonly config: ConversationConfigRepository,private readonly history: HistorySource,private readonly context: ContextBuilder,private readonly provider: Pick<ProviderRouter,'generateWithFallback'>) {}
   async handleDirect(request: BotRequest): Promise<DirectOutcome> {
@@ -23,7 +23,7 @@ export class DirectService {
       if (!p) throw new ConversationError('context_limit');
       const input: GenerationInput = { instructions: settings.instructions,context,mode: 'direct',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
       return { status: 'accepted',result: await this.provider.generateWithFallback(r,input,settings.revision) };
-    } catch (e) { if (e instanceof ConversationError || e instanceof ProviderFailure) throw e; throw new ConversationError('direct_failed'); }
+    } catch (e) { if ((e instanceof ConversationError || e instanceof ProviderFailure) && e.message === 'input_too_large') return { ...INPUT_TOO_LARGE }; if (e instanceof ConversationError || e instanceof ProviderFailure) throw e; throw new ConversationError('direct_failed'); }
     finally { this.eligibility.completeDirect(r); }
   }
 }

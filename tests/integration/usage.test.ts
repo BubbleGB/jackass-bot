@@ -182,7 +182,7 @@ describe('atomic usage reservations and settlement', () => {
     const router = new ProviderRouter(new PostgresProviderRepository(db),usage,{ open() { return 'fake-key'; } },new Map([['google',adapter]]),() => now);
     const request: BotRequest = { id: 'oversized',guildId: guild,channelId: other,userId: other,source: 'ask',receivedAt: now };
     const input: GenerationInput = { instructions: 'Be kind.',context: [],modelId: 'ignored',mode: 'direct',maxGenerationTokens: 2048 };
-    await expect(router.generateWithFallback(request,input)).rejects.toThrow('providers_unavailable');
+    await expect(router.generateWithFallback(request,input)).rejects.toThrow('input_too_large');
     expect((await router.generateWithFallback({ ...request,id: 'short_after_oversized' },input)).kind).toBe('answer');
     expect(counts).toBe(2); expect(generations).toBe(1);
   });

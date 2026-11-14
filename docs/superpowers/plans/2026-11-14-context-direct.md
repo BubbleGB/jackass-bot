@@ -15,19 +15,21 @@ Tech stack: pinned Node 26.13.1/npm 11.20.0, TypeScript, Vitest, existing Postgr
 - Keep Task 3 estimate/actual accounting and bounded fallback unchanged.
 - Work in the requested local checkout/feature branch; no extra worktree.
 - Use the handoff's already approved design; implementation details are builder choices.
-- Counts include the current direct message/prompt in the human cap. A zero human cap or
-  token budget too small for required input fails closed rather than silently raising caps.
-- Required input may be suffix-truncated for token fit, preserving its ID exactly once;
-  drop oldest optional history first. Count full instructions/history/schema through an
-  injected provider counter for every configured funded supported model; never chars/4.
-- At most 3 pages of 100 messages, 300 scanned, max 120 selected. No reference/media fetches.
+- User correction supersedes the initial cap/truncation decisions: human/self caps
+  cover historical messages only; current direct text is separate and included once.
+- Instructions and current direct text are required and never truncated. Remove oldest
+  optional whole history first; return typed input_too_large without generation if
+  required input + generation allowance cannot fit. Preserve one nonblank human message
+  for automatic context or return a diagnosable skip; no Task 5 scheduler is introduced.
+- At most 3 pages of 100 messages, 300 scanned, 120 history + one direct request selected.
+  No reference/media fetches. Restart clearing cooldown state is user-accepted for v1.
 - Conservative prefilter: reject empty slash prompts only; never guess that slang is spam.
 
 ## Review focus
 
 - Cross-guild/channel forged history and duplicate trigger rows must not escape filtering.
 - Permission loss or revision changes during fetching/counting must stop provider calls.
-- Tiny budgets/oversized trigger: keep newest required content or fail before generation.
+- Tiny budgets/oversized trigger: preserve full required content or return typed rejection without generation.
 - Concurrent async eligibility checks must not admit the same user twice; release by ID.
 - Count failures/timeouts must fail closed without leaking keys or conversation text.
 
@@ -50,7 +52,17 @@ Tech stack: pinned Node 26.13.1/npm 11.20.0, TypeScript, Vitest, existing Postgr
 
 Expected: every verification command exits 0; final PR remains open/unmerged.
 
-Local implementation/review complete: 160 unit and 64 isolated PostgreSQL tests, lint,
+Initial implementation/review at fa52564: 160 unit and 64 isolated PostgreSQL tests, lint,
 typecheck, build, migration consistency and foundation startup passed. Two review findings
 received failing regressions before fixes: permission loss before native counts and
 provider recovery bypassing the fitted input cap. Remote CI results live in the PR.
+
+Follow-up user correction: regressions cover zero-history mention/reply/ask, exact intact
+required input, oversize rejection without generation/reservation, history trimming order,
+automatic meaningful-context skip reasons and native 121-message direct request guards.
+Updated verification results are recorded in PR #4.
+
+Required-input follow-up verified locally: 180 unit tests, 68 isolated PostgreSQL integration
+tests, lint, typecheck, build, migration consistency and foundation startup passed. Fresh
+read-only review found no Critical/Important issues; its automatic overlong-trigger fallback
+edge received a failing regression, a fix and the full green suite before push.

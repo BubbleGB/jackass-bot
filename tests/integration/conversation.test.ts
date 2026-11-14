@@ -42,10 +42,10 @@ describe('isolated direct context to transactional providers',() => {
     await db.pool.query('INSERT INTO approved_guilds(guild_id,approved_by) VALUES($1,$1)',[guild]);
     await db.pool.query('UPDATE guild_settings SET enabled=false WHERE guild_id=$1',[guild]); expect(await configs.load(guild)).toBeNull();
   });
-  function pipeline(changeBeforeRouting = false) {
+  function pipeline(changeBeforeRouting = false,countInput: (call: number) => number = () => 120) {
     const history = source(),store = new PostgresProviderRepository(db); let counts = 0,generations = 0;
     const adapter = new OpenAIAdapter(async r => {
-      if (r.url.endsWith('/input_tokens')) { counts++; return { status: 200,headers: {},body: { input_tokens: 120 } }; }
+      if (r.url.endsWith('/input_tokens')) { counts++; return { status: 200,headers: {},body: { input_tokens: countInput(counts) } }; }
       generations++;
       expect(r.body.instructions).toContain('Server personality follows:');
       expect((r.body.input as { content: string }[])[0]!.content).toContain('hello');
@@ -63,6 +63,25 @@ describe('isolated direct context to transactional providers',() => {
     expect((await db.pool.query('SELECT requests,total_tokens,reserved_tokens FROM daily_usage WHERE guild_id=$1',[guild])).rows[0]).toMatchObject({ requests: '1',total_tokens: '30',reserved_tokens: '0' });
     expect((await p.service.handleDirect(request)).status).toBe('cooldown'); expect(p.generations()).toBe(1);
     expect(JSON.stringify((await db.pool.query('SELECT * FROM request_receipts')).rows)).not.toContain('hello');
+  });
+  it.each(['instructions','prompt'] as const)('rejects oversized required %s before generation or reservation',async part => {
+    await db.pool.query('UPDATE guild_settings SET context_token_limit=100,instructions=$2 WHERE guild_id=$1',[guild,part === 'instructions' ? 'private server instructions'.repeat(200) : 'Be kind.']);
+    const p = pipeline();
+    const r = part === 'prompt' ? { ...request,source: 'ask' as const,prompt: 'private full prompt'.repeat(100) } : request;
+    expect(await p.service.handleDirect(r)).toMatchObject({ status: 'input_too_large' });
+    expect(p.generations()).toBe(0); expect((await db.pool.query('SELECT count(*) FROM usage_reservations')).rows[0].count).toBe('0');
+    expect((await db.pool.query('SELECT daily_allowance FROM provider_configs WHERE guild_id=$1',[guild])).rows[0].daily_allowance).toBe('5000');
+  });
+  it('zero human history still reaches the real router with the current request once',async () => {
+    await db.pool.query('UPDATE guild_settings SET human_context_limit=0,self_context_limit=0 WHERE guild_id=$1',[guild]);
+    const p = pipeline(); expect((await p.service.handleDirect(request)).status).toBe('accepted'); expect(p.generations()).toBe(1);
+  });
+  it('returns typed input-too-large if final preflight is larger than sizing, without generating or reserving',async () => {
+    await db.pool.query('UPDATE guild_settings SET context_token_limit=100 WHERE guild_id=$1',[guild]);
+    const p = pipeline(false,call => call === 1 ? 80 : 120);
+    expect(await p.service.handleDirect(request)).toMatchObject({ status: 'input_too_large' });
+    expect(p.counts()).toBe(2); expect(p.generations()).toBe(0);
+    expect((await db.pool.query('SELECT count(*) FROM usage_reservations')).rows[0].count).toBe('0');
   });
   it.each(['backoff','allowance'] as const)('enforces fitted input limits when a primary recovers %s before routing',async recovery => {
     await db.pool.query('UPDATE guild_settings SET context_token_limit=150 WHERE guild_id=$1',[guild]);

@@ -58,6 +58,17 @@ describe('curated model contracts and provider fixtures', () => {
     expect(await new GoogleAdapter(transport({ totalTokens: 1000 })).estimateUsage(googleInput,'fake-key',signal())).toBe(3148);
     for (const body of [{},{ totalTokens: -1 },{ totalTokens: 1048576 }]) await expect(new GoogleAdapter(transport(body)).estimateUsage(googleInput,'fake-key',signal())).rejects.toThrow();
   });
+  it.each(['openai','google'] as const)('allows 120 history messages plus one required direct input for %s, but keeps automatic/history bounds',async provider => {
+    let calls = 0;
+    const http: HttpTransport = async () => { calls++; return { status: 200,headers: {},body: { input_tokens: 120,totalTokens: 120 } }; };
+    const adapter = provider === 'openai' ? new OpenAIAdapter(http) : new GoogleAdapter(http);
+    const context = Array.from({ length: 121 },(_,i) => ({ ...input.context[0]!,id: String(i+1),kind: i < 20 ? 'self' as const : 'human' as const,text: `message ${i}` }));
+    const request = { ...input,modelId: provider === 'openai' ? input.modelId : 'gemini-3.5-flash-lite',context };
+    expect(await adapter.estimateUsage(request,'fake-key',signal())).toBe(provider === 'openai' ? 2168 : 2200);
+    await expect(adapter.estimateUsage({ ...request,mode: 'auto_conditional' },'fake-key',signal())).rejects.toThrow('invalid_input');
+    await expect(adapter.estimateUsage({ ...request,context: [...context,context[0]!] },'fake-key',signal())).rejects.toThrow('invalid_input');
+    expect(calls).toBe(1);
+  });
   it('requires explicit structured silence, distinguishing empty transport output', async () => {
     expect((await new OpenAIAdapter(transport(openResponse('{"kind":"silence","text":""}'))).generate(input,'fake-key',signal())).kind).toBe('silence');
     await expect(new OpenAIAdapter(transport(openResponse(''))).generate(input,'fake-key',signal())).rejects.toMatchObject({ safeCode: 'invalid_output',usage: { totalTokens: 130 } });

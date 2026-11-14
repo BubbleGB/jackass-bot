@@ -77,6 +77,13 @@ describe('bounded provider orchestration', () => {
     await expect(f.router().generateWithFallback(request,input,2)).rejects.toThrow('configuration_changed');
     expect(counted).toBe(0); expect(f.calls).toEqual([]);
   });
+  it('does not label a request as pre-generation input rejection after a primary was already sent',async () => {
+    const f = fixture();
+    f.adapters.get('openai')!.generate = async () => { throw new ProviderFailure('uncertain','transport_uncertain'); };
+    f.adapters.get('google')!.estimateUsage = async () => 10049;
+    await expect(f.router().generateWithFallback(request,input)).rejects.toThrow('providers_unavailable');
+    expect(f.settlements).toEqual(['openai:uncertain']);
+  });
   it('bounds an uncooperative generation to 60 seconds and keeps its reservation', async () => {
     vi.useFakeTimers();
     try {

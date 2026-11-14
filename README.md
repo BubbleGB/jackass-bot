@@ -95,5 +95,7 @@ workflow is present.
 
 Pending later inputs include application/creator/guild IDs, credentials through secret
 storage, contact link, the original mascot logo, registry access and an encrypted off-VPS
-backup destination. None is needed to run Task 1 checks. Task 3 is the current boundary. Leave its PR unmerged; Task 4, VPS
-access and deployment require further instruction.
+backup destination. None is needed to run Task 1 checks. Task 4 is the current boundary; PR #4 remains unmerged. Task 5, VPS
+access and deployment require further instruction. Current direct text is separate from
+history caps and never silently truncated; oversized required input gets a typed rejection.
+The user accepts the in-memory cooldown resetting on restart for v1.

@@ -21,7 +21,7 @@ export class ProviderRouter {
     if (!isSnowflake(request.guildId) || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id)) throw new ProviderFailure('configuration','invalid_request',{ notSent: true });
     if (!await this.repository.claim(request.guildId,request.id)) throw new ProviderFailure('configuration','request_not_claimed',{ notSent: true });
     // Freeze caller-owned conversation data for count/generation consistency; never persist it.
-    let uncertain = false;
+    let uncertain = false,inputRejected = false,anyGenerationStarted = false;
     try {
       let immutable: GenerationInput;
       try { immutable = structuredClone(input); } catch { throw new ProviderFailure('configuration','invalid_input',{ notSent: true }); }
@@ -55,7 +55,7 @@ export class ProviderRouter {
           if (!reservation) continue;
           phase = 'prepare';
           if (controller.signal.aborted || !await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
-          generationStarted = true; phase = 'generate';
+          generationStarted = true; anyGenerationStarted = true; phase = 'generate';
           const result = await bounded(() => adapter.generate(generation,credential,controller.signal),controller.signal);
           receivedResult = true; phase = 'bookkeeping';
           if (result.usage.certainty === 'reported') await this.usage.settleUsage(reservation.id,result.usage,'known');
@@ -66,6 +66,7 @@ export class ProviderRouter {
         } catch (raw) {
           if (receivedResult || phase === 'reserve' || raw instanceof UsageError) { uncertain = true; throw new ProviderFailure('uncertain','accounting_unavailable'); }
           const error = raw instanceof ProviderFailure ? raw : new ProviderFailure('uncertain','provider_error');
+          if (error.safeCode === 'input_too_large') inputRejected = true;
           if (reservation) {
             const outcome = error.usage?.certainty === 'reported' ? 'known' : !generationStarted || error.notSent ? 'not_sent' : 'uncertain';
             if (outcome === 'uncertain') uncertain = true;
@@ -76,6 +77,7 @@ export class ProviderRouter {
           if (error.safeCode === 'provider_rejected') throw error;
         } finally { clearTimeout(timer); controller.abort(); }
       }
+      if (inputRejected && !anyGenerationStarted) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
       throw new ProviderFailure('quota','providers_unavailable');
     } catch (error) {
       await this.repository.finish(request.guildId,request.id,uncertain ? 'uncertain' : 'failed');

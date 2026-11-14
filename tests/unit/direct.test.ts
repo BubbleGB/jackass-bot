@@ -53,6 +53,17 @@ describe('server-wide direct request eligibility and lifecycle',() => {
     expect((await f.service.handleDirect({ ...request,source: 'ask',prompt })).status).toBe('accepted');
     expect(f.calls()).toBe(1); expect(seen?.context.filter(c => c.text === prompt)).toHaveLength(1); expect(seen?.instructions).toBe('Be kind.');
   });
+  it.each(['budget','instructions','prompt','mention'] as const)('returns typed safe input-too-large with no generation and releases outstanding state for %s',async oversized => {
+    const f = fixture();
+    if (oversized === 'budget') f.config.contextTokenLimit = 1;
+    if (oversized === 'instructions') f.config.instructions = 'private instructions'.repeat(500);
+    if (oversized === 'mention') f.history.fetchTrigger = async () => message(request.id,'private current'.repeat(500));
+    const r = oversized === 'prompt' ? { ...request,source: 'ask' as const,prompt: 'private prompt'.repeat(500) } : request;
+    const outcome = await f.service.handleDirect(r);
+    expect(outcome).toMatchObject({ status: 'input_too_large',message: expect.any(String) });
+    expect(JSON.stringify(outcome)).not.toMatch(/private|fake-key/); expect(f.calls()).toBe(0);
+    f.advance(5000); expect(await f.gate.acceptDirect(request)).toBe('accepted');
+  });
   it('rejects disabled/unapproved config, spoofed guilds, lost permissions and nonhuman triggers before providers',async () => {
     for (const mode of ['disabled','switch','guild','permissions','bot','webhook','not-mentioned'] as const) {
       const f = fixture();

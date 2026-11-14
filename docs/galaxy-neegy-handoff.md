@@ -31,6 +31,20 @@ showed no blockers. The accounting amendment above remains in force; its former 
 Task 4 stop point is historical. Task 4 must stop with its new PR unmerged. Task 5, VPS
 access and deployment remain unauthorized. See [Task 4 contracts](context-direct.md).
 
+## Task 4 required-input correction — 14 November 2026
+
+The user's correction supersedes Task 4's initial builder cap/truncation decisions.
+Human/own-bot history limits govern previous messages only. Always include the intact
+current mention/reply or /ask prompt once, separately from those caps, even when human
+history is zero. Server instructions and current direct text are required: remove optional
+history first, never silently truncate required input, and return typed user-safe
+`input_too_large` without generation when required input plus the configured generation
+ceiling cannot fit. Automatic context must retain usable human conversation with unchanged
+instructions or return a diagnosable skip; this does not authorize Task 5 scheduling.
+The user accepts cooldown state clearing on restart for v1. Live Discord wiring remains
+later-task work. Keep PR #4 unmerged, preserve the accounting amendment, and do not start
+Task 5, access the VPS or deploy.
+
 ## Read this first
 
 The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.

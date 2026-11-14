@@ -1,7 +1,7 @@
 import type { DiscordGet } from '../access/discord-membership.js';
 import { isSnowflake } from '../access/policy.js';
 import type { BotRequest } from '../domain/types.js';
-import { ConversationError,contextOperation,validRequest,type HistoryMessage,type HistoryPage,type HistorySource } from './types.js';
+import { ConversationError,contextOperation,validContextRequest,type HistoryMessage,type HistoryPage,type HistorySource } from './types.js';
 const record = (v: unknown): Record<string,unknown> => { if (!v || typeof v !== 'object' || Array.isArray(v)) throw new ConversationError('context_unavailable'); return v as Record<string,unknown>; };
 const bits = (v: unknown): bigint => { if (typeof v !== 'string' || !/^\d{1,30}$/.test(v)) throw new ConversationError('context_unavailable'); return BigInt(v); };
 const REQUIRED = (1n << 10n) | (1n << 11n) | (1n << 16n), ADMIN = 8n;
@@ -9,7 +9,7 @@ const REQUIRED = (1n << 10n) | (1n << 11n) | (1n << 16n), ADMIN = 8n;
 export class DiscordContextSource implements HistorySource {
   constructor(private readonly get: DiscordGet,readonly botId: string,private readonly now: () => Date = () => new Date()) {}
   async canRead(r: BotRequest,signal: AbortSignal): Promise<boolean> {
-    if (!validRequest(r) || !isSnowflake(this.botId) || signal.aborted) return false;
+    if (!validContextRequest(r) || !isSnowflake(this.botId) || signal.aborted) return false;
     try {
       return await contextOperation(async timeout => {
         const joined = AbortSignal.any([signal,timeout]);
@@ -46,7 +46,7 @@ export class DiscordContextSource implements HistorySource {
     } catch { return null; }
   }
   async fetchPage(r: BotRequest,before: string | undefined,limit: number,signal: AbortSignal): Promise<HistoryPage> {
-    if (!validRequest(r) || limit !== 100 || (before !== undefined && !isSnowflake(before)) || signal.aborted) throw new ConversationError('context_unavailable');
+    if (!validContextRequest(r) || limit !== 100 || (before !== undefined && !isSnowflake(before)) || signal.aborted) throw new ConversationError('context_unavailable');
     try {
       const raw = await this.get(`/channels/${r.channelId}/messages?limit=100${before ? `&before=${before}` : ''}`,signal);
       if (!Array.isArray(raw) || raw.length > 100) throw new ConversationError('context_unavailable');
@@ -58,7 +58,7 @@ export class DiscordContextSource implements HistorySource {
     } catch { throw new ConversationError('context_unavailable'); }
   }
   async fetchTrigger(r: BotRequest,signal: AbortSignal): Promise<HistoryMessage | null> {
-    if (!validRequest(r) || r.source === 'ask' || signal.aborted) return null;
+    if (!validContextRequest(r) || r.source === 'ask' || signal.aborted) return null;
     try { const m = this.message(await this.get(`/channels/${r.channelId}/messages/${r.id}`,signal),r); return m?.id === r.id && !m.authorBot ? m : null; }
     catch { throw new ConversationError('context_unavailable'); }
   }
