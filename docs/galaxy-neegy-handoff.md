@@ -45,6 +45,15 @@ The user accepts cooldown state clearing on restart for v1. Live Discord wiring 
 later-task work. Keep PR #4 unmerged, preserve the accounting amendment, and do not start
 Task 5, access the VPS or deploy.
 
+## Task 5 execution authorization — 14 November 2026
+
+The user authorized merging PR #4 only after verifying latest head `abb4b08`, passing checks
+and no review blockers. It squash-merged as `6fb49ab`. The user now authorizes Task 5 in
+Cloud on `feat/task-5-automatic`, with injected clocks, mocks and isolated PostgreSQL.
+Earlier Task 5 stop points above are historical; preserve their accounting and required-
+input policies. Stop with Task 5's PR unmerged. Live Discord wiring and deployment remain
+later phases; no paid calls, production keys, VPS access or deployment is authorized.
+
 ## Read this first
 
 The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.

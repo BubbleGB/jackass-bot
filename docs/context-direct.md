@@ -2,7 +2,7 @@
 
 These are internal backend services, with injected Discord REST, clocks, counters and
 configuration. Runtime Discord events, slash acknowledgement, sending/typing and output
-mention controls remain Task 6; queueing/global worker control remains Task 5. Foundation
+mention controls remain Task 6; queueing/global worker control is implemented by Task 5 in [automatic.md](automatic.md). Foundation
 startup still validates config and exits. No live provider/Discord calls or production
 keys were used to verify this task.
 
@@ -131,8 +131,7 @@ context/config/permission error and provider failure. Release is matched to requ
 it does not erase the acceptance cooldown. State contains identifiers/times only, with
 10,000 entries maximum and expired idle entries pruned on capacity pressure. It is local
 to one process, so a restart clears this five-second gate. The user explicitly accepted
-this behavior for v1; cooldown persistence is not a remaining blocker. Task 5's singleton/queue guard
-is still required before runtime activation. There is no automatic retry or delivery here.
+this behavior for v1; cooldown persistence is not a remaining blocker. Task 5's singleton/queue guard now composes these services before runtime activation. There is no automatic retry or delivery here.
 Future slash handlers must acknowledge cooldown/busy privately; mentions/replies may be
 ignored. Duplicate generation receipts remain Task 3's responsibility; no Task 5 counters
 or automatic scheduling have been added.

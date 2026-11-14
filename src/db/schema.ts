@@ -37,9 +37,15 @@ export const providerConfigs = pgTable('provider_configs', {
 export const autoChannels = pgTable('auto_channels', {
   guildId: guildId(), channelId: text('channel_id').notNull(),
 }, (t) => [primaryKey({ columns: [t.guildId, t.channelId] })]);
+/** Persistent fencing epoch; ownership itself is held by a dedicated session lock. */
+export const workerOwnership = pgTable('worker_ownership', {
+  name: text('name').primaryKey(),token: uuid('token').notNull(),
+},t => [check('worker_ownership_singleton',sql`${t.name} = 'conversation'`)]);
 export const channelState = pgTable('channel_state', {
   guildId: guildId(), channelId: text('channel_id').notNull(), pendingCount: counter('pending_count'),
   assessmentSnapshot: bigint('assessment_snapshot', { mode: 'bigint' }), assessmentId: uuid('assessment_id'), assessmentStartedAt: time('assessment_started_at'),
+  lastEventId: text('last_event_id'), lastUserId: text('last_user_id'), lastEventAt: time('last_event_at'),
+  lastWasDirect: boolean('last_was_direct').default(false).notNull(), readyEventId: text('ready_event_id'), assessmentEventId: text('assessment_event_id'),
   lastSuccessAt: time('last_success_at'), updatedAt: time('updated_at').defaultNow().notNull(),
 }, (t) => [
   primaryKey({ columns: [t.guildId, t.channelId] }),

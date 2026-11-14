@@ -4,12 +4,14 @@ bot for aa
 
 ## Galaxy Neegy — settings and access foundation
 
-A TypeScript foundation recovered from the phone and extended through Task 4 of the approved [handoff](docs/galaxy-neegy-handoff.md).
+A TypeScript foundation recovered from the phone and extended through Task 5 of the approved [handoff](docs/galaxy-neegy-handoff.md).
 The current program validates configuration and exits. Discord startup, AI calls, HTTP routes and the dashboard are not implemented yet.
 Task 2 adds backend access/settings/credential services. Task 3 adds provider adapters and
 atomic usage accounting; see [provider/accounting contracts and limitations](docs/providers-usage.md).
 Task 4 adds bounded channel context and direct eligibility/cooldowns; see
 [context and direct-request contracts](docs/context-direct.md).
+Task 5 adds durable activity/snapshot accounting and a bounded single-worker queue; see
+[automatic scheduling contracts](docs/automatic.md).
 These services are not yet wired to live Discord or HTTP routes.
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
@@ -95,7 +97,7 @@ workflow is present.
 
 Pending later inputs include application/creator/guild IDs, credentials through secret
 storage, contact link, the original mascot logo, registry access and an encrypted off-VPS
-backup destination. None is needed to run Task 1 checks. Task 4 is the current boundary; PR #4 remains unmerged. Task 5, VPS
+backup destination. None is needed to run Task 1 checks. Task 5 is the current boundary; its PR remains unmerged. Live Discord wiring, VPS
 access and deployment require further instruction. Current direct text is separate from
 history caps and never silently truncated; oversized required input gets a typed rejection.
 The user accepts the in-memory cooldown resetting on restart for v1.
