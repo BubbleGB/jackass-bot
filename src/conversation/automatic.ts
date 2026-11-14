@@ -7,13 +7,14 @@ import { ConversationQueue } from './queue.js';
 import { AutomaticRepository } from './receipts.js';
 import type { PostgresWorkerGuard } from './worker.js';
 import { ConversationError,contextOperation,humanTrigger,validContextRequest,type ConversationConfigRepository,type HistorySource } from './types.js';
-export type ScheduledOutcome = { kind: 'result'; result: GenerationResult } | { kind: 'direct'; outcome: DirectOutcome } | { kind: 'skipped'; reason: string };
+export type ScheduledOutcome = { kind: 'result'; result: GenerationResult; participantIds?: string[] } | { kind: 'direct'; outcome: DirectOutcome } | { kind: 'skipped'; reason: string };
 interface Dependencies {
   repository: Pick<AutomaticRepository,'observe' | 'begin' | 'finish' | 'recover'>; config: ConversationConfigRepository; history: HistorySource;
   context: Pick<ContextBuilder,'buildAutomaticContext'>; direct: Pick<DirectService,'handleDirect'>;
   provider: Pick<ProviderRouter,'generateWithFallback'>; queue: ConversationQueue;
   worker: Pick<PostgresWorkerGuard,'start' | 'stop' | 'assertActive' | 'signal' | 'token'>;
   now?: () => Date; onOutcome?: (request: BotRequest,outcome: ScheduledOutcome) => void | Promise<void>;
+  onBegin?: (request: BotRequest) => void; onEnd?: (request: BotRequest) => void;
 }
 export class AutomaticService {
   private started = false; private accepting = false; private stopping = false;
@@ -56,16 +57,25 @@ export class AutomaticService {
       if (!current || !current.enabled || (r.source === 'automatic' ? !current.autoChannels.includes(r.channelId) : !current.directEnabled) || !await this.deps.history.canRead(r,this.deps.worker.signal)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
     } };
   }
-  /** Caller receives a result to deliver later; this module never sends Discord messages. */
+  /** Publishes an outcome within its queue slot; the adapter owns all Discord sends. */
   async submitDirect(request: BotRequest,admitted: () => void = () => undefined): Promise<DirectOutcome> {
-    const r = structuredClone(request);
+    const r = structuredClone(request); let executed = false;
+    const failure = (e: unknown) => this.emit(r,{ kind: 'skipped',reason: e instanceof ProviderFailure ? e.safeCode : e instanceof ConversationError ? e.message : 'direct_failed' });
     try {
       if (!this.accepting) throw new ConversationError('worker_stopped');
       await this.active();
-      return await this.deps.direct.handleDirect(r,run => {
-        const result = this.deps.queue.submit(r,async () => { await this.active(); return run(); }); admitted(); return result;
+      const outcome = await this.deps.direct.handleDirect(r,run => {
+        const result = this.deps.queue.submit(r,async () => {
+          executed = true;
+          try { await this.active(); this.deps.onBegin?.(r); const value = await run(); await this.emit(r,{ kind: 'direct',outcome: value }); return value; }
+          catch (e) { await failure(e); throw e; }
+          finally { this.deps.onEnd?.(r); }
+        }); admitted(); return result;
       },this.controls(r));
-    } finally { admitted(); }
+      if (!executed) await this.emit(r,{ kind: 'direct',outcome });
+      return outcome;
+    } catch (e) { if (!executed) await failure(e); throw e; }
+    finally { admitted(); }
   }
   async observeMessage(request: BotRequest,now = this.now()): Promise<'counted' | 'eligible' | 'ignored'> {
     if (!this.accepting || !validContextRequest(request) || request.source === 'ask') return 'ignored';
@@ -84,7 +94,7 @@ export class AutomaticService {
       if (observed.direct) {
         const direct = { ...r,source: validated.human.repliesToBot ? 'reply' as const : 'mention' as const };
         let admitted!: () => void; const admission = new Promise<void>(resolve => { admitted = resolve; });
-        void this.submitDirect(direct,admitted).then(outcome => this.emit(direct,{ kind: 'direct',outcome })).catch(() => this.emit(direct,{ kind: 'skipped',reason: 'direct_failed' })).catch(() => undefined);
+        void this.submitDirect(direct,admitted).catch(() => undefined);
         await admission;
       } else if (observed.status === 'eligible') {
         const key = `${r.guildId}:${r.channelId}`;
@@ -101,6 +111,7 @@ export class AutomaticService {
     await this.active(); const a = await this.deps.repository.begin(guildId,channelId,this.now(),this.deps.worker.token); if (!a) return;
     let succeeded = false;
     try {
+      this.deps.onBegin?.(a.request);
       const settings = await this.deps.config.load(guildId);
       if (!settings || settings.revision !== a.revision || !settings.autoChannels.includes(channelId)) throw new ConversationError('configuration_changed');
       const context = await this.deps.context.buildAutomaticContext(a.request,settings,this.deps.worker.signal);
@@ -110,10 +121,11 @@ export class AutomaticService {
       const input: GenerationInput = { instructions: settings.instructions,context: context.context,mode: settings.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
       const result = await this.deps.provider.generateWithFallback(a.request,input,a.revision,this.controls(a.request));
       await this.active(); succeeded = await this.deps.repository.finish(a,true,this.now(),this.deps.worker.token);
-      if (succeeded) await this.emit(a.request,{ kind: 'result',result });
+      if (succeeded) await this.emit(a.request,{ kind: 'result',result,participantIds: [...new Set(context.context.filter(c => c.kind === 'human').map(c => c.authorId))] });
     } catch (e) {
       await this.emit(a.request,{ kind: 'skipped',reason: e instanceof ProviderFailure ? e.safeCode : e instanceof ConversationError ? e.message : 'assessment_failed' });
     } finally {
+      this.deps.onEnd?.(a.request);
       if (!succeeded && !this.deps.worker.signal.aborted) { await this.active(); await this.deps.repository.finish(a,false,this.now(),this.deps.worker.token); }
     }
   }

@@ -17,9 +17,12 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js"
+    "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js",
+    "discord:register:test": "node --env-file-if-exists=.env dist/discord/register-cli.js --guild",
+    "discord:register:production": "node --env-file-if-exists=.env dist/discord/register-cli.js --global --production"
   },
   "dependencies": {
+    "discord.js": "14.28.1",
     "drizzle-orm": "0.45.4",
     "pg": "8.23.1"
   },

@@ -54,6 +54,18 @@ Earlier Task 5 stop points above are historical; preserve their accounting and r
 input policies. Stop with Task 5's PR unmerged. Live Discord wiring and deployment remain
 later phases; no paid calls, production keys, VPS access or deployment is authorized.
 
+## Task 6 execution authorization — 14 November 2026
+
+The user authorized merging PR #5 only after verifying latest head `20c2533`, passing
+checks and no unresolved review blockers. It squash-merged as `0144842`. Task 6 is now
+authorized in Cloud on `feat/task-6-discord`: mocked Discord/provider handlers and explicit
+registration tooling, keeping the existing services responsible for their decisions.
+Earlier Task 6 stop points are historical. Preserve the accounting amendment, required
+input/context rules and Task 5 activity/queue guarantees. Stop with the Task 6 PR unmerged.
+No Task 7, production tokens, live registrations, paid calls, VPS access or deployment.
+See [Discord contracts and remaining live smoke tests](discord.md). Foundation startup
+remains validation-only until the integrated lifecycle phase.
+
 ## Read this first
 
 The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.

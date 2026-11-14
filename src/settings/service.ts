@@ -1,3 +1,5 @@
+import { configurationKey } from '../providers/store.js';
+import type { UsageStatus } from '../usage/status.js';
 import { supportsModel } from '../providers/catalog.js';
 import type { Pool, PoolClient } from 'pg';
 import type { Database } from '../db/index.js';
@@ -65,6 +67,20 @@ export class SettingsService implements CredentialService {
     return settings.providers.some(p => p.modelId !== null && BigInt(p.dailyAllowance) > 0n && this.modelSupport({ provider: p.provider, modelId: p.modelId, effort: p.effort, contextTokenLimit: settings.contextTokenLimit, maxGenerationTokens: settings.maxGenerationTokens }));
   }
   async getSettings(actorId: string, guildId: string): Promise<GuildSettings> { return this.protected(actorId, guildId, 'read', client => this.load(client, guildId)); }
+  async getUsageStatus(actorId: string,guildId: string,now: Date): Promise<UsageStatus> {
+    if (!Number.isFinite(now.getTime())) throw new SettingsError('invalid_settings');
+    return this.protected(actorId,guildId,'read',async client => {
+      const settings = await this.load(client,guildId);
+      const rows = (await client.query('SELECT p.*,d.total_tokens,d.uncertain_tokens,d.reserved_tokens,d.requests,h.configuration_key AS health_key,h.blocked,h.next_retry_at FROM provider_configs p LEFT JOIN daily_usage d ON d.guild_id=p.guild_id AND d.provider=p.provider AND d.utc_date=$2 LEFT JOIN provider_health h ON h.guild_id=p.guild_id AND h.provider=p.provider WHERE p.guild_id=$1 ORDER BY p.priority',[guildId,now.toISOString().slice(0,10)])).rows;
+      const resetAt = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1)).toISOString();
+      return { resetAt,providers: rows.map(p => {
+        const total = BigInt(p.total_tokens ?? 0),uncertain = BigInt(p.uncertain_tokens ?? 0),reserved = BigInt(p.reserved_tokens ?? 0),balance = BigInt(p.daily_allowance)-total-uncertain-reserved;
+        const fingerprint = configurationKey({ ciphertext: p.ciphertext,nonce: p.nonce,keyVersion: p.key_version,modelId: p.model_id,effort: p.effort });
+        const availability = !settings.enabled ? 'disabled' : p.model_id === null ? 'not configured' : p.health_key === fingerprint && p.blocked ? 'configuration needs attention' : p.health_key === fingerprint && p.next_retry_at && p.next_retry_at.getTime() > now.getTime() ? 'backoff' : balance < BigInt(settings.maxGenerationTokens) ? 'allowance unavailable' : 'available';
+        return { provider: p.provider as string,modelId: p.model_id as string | null,remaining: (balance > 0n ? balance : 0n).toString(),total: total.toString(),uncertain: uncertain.toString(),reserved: reserved.toString(),requests: String(p.requests ?? 0),availability };
+      }) };
+    });
+  }
   async updateSettings(actorId: string, guildId: string, input: SettingsPatch, expectedRevision: number): Promise<GuildSettings> {
     const patch = validatePatch(input);
     if (patch.autoChannels) {
