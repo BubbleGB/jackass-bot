@@ -8,7 +8,7 @@ import { guild,channel,user,request } from '../helpers/conversation.js';
 describe('Discord gateway binding and explicit registration',() => {
   it('binds authenticated message/command identity with minimal intents and never registers on ready/reconnect',async () => {
     const emitter = new EventEmitter(),messages: unknown[] = [],commands: unknown[] = []; let options!: ClientOptions,logins = 0;
-    const gateway = createDiscordClient({ async handleMessage(m) { messages.push(m); },async handleInteraction(i) { commands.push(i); } },o => { options = o; return { on: emitter.on.bind(emitter) as never,async login() { logins++; return 'fake'; },async destroy() {} }; });
+    const gateway = createDiscordClient({ async handleMessage(m) { messages.push(m); },async handleInteraction(i) { commands.push(i); } },o => { options = o; return { on: emitter.on.bind(emitter) as never,removeListener: emitter.removeListener.bind(emitter) as never,user: null,isReady: () => true,async login() { logins++; emitter.emit('clientReady'); return 'fake'; },async destroy() {} }; });
     expect(options.intents).toEqual([GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]); expect(logins).toBe(0);
     await gateway.start('fake-token'); emitter.emit('clientReady'); emitter.emit('shardResume',0); expect(logins).toBe(1);
     emitter.emit('messageCreate',{ id: request.id,guildId: guild,channelId: channel,channel: { type: 0 },author: { id: user,bot: false },webhookId: null });

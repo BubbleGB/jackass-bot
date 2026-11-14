@@ -52,7 +52,7 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   await routes(app,d,async r => (await identity(r))!.actor);
   if (d.assets) {
     await app.register(staticFiles,{ root: resolve(d.assets),prefix: '/',index: false });
-    for (const path of ['/','/servers','/servers/:guildId','/creator']) app.get(path,(_r,reply) => reply.sendFile('index.html'));
+    for (const path of ['/','/privacy','/servers','/servers/:guildId','/creator']) app.get(path,(_r,reply) => reply.sendFile('index.html'));
   }
   return app;
 }

@@ -1,0 +1,91 @@
+name: galaxy-neegy
+services:
+  app:
+    image: ${GALAXY_IMAGE:?Set the verified immutable application image}
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 120s
+    networks: [backend, public]
+    environment:
+      NODE_ENV: production
+      APP_MODE: runtime
+      PORT: "3000"
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the public HTTPS origin}
+      CONTACT_URL: ${CONTACT_URL:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?Set the Discord application ID}
+      CREATOR_USER_ID: ${CREATOR_USER_ID:?Set the creator ID}
+      ENCRYPTION_KEY_VERSION: ${ENCRYPTION_KEY_VERSION:-1}
+      DATABASE_URL_FILE: /run/secrets/database_url
+      ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+      DISCORD_BOT_TOKEN_FILE: /run/secrets/discord_bot_token
+      DISCORD_CLIENT_SECRET_FILE: /run/secrets/discord_client_secret
+    secrets: [database_url, encryption_key, discord_bot_token, discord_client_secret]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Bind only loopback. Task 9 must inspect/configure the actual HTTPS proxy.
+    ports: ["127.0.0.1:${GALAXY_HTTP_PORT:-3000}:3000"]
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+  postgres:
+    image: postgres:18.7-bookworm@sha256:ece55f7868da684e400f82f1030a050718adbdd65c23aa500c486f6e2950dc0f
+    restart: unless-stopped
+    # Avoid logging SQL, bound parameters or error detail rows containing settings.
+    command: [postgres, -c, log_statement=none, -c, log_min_error_statement=panic, -c, log_error_verbosity=terse, -c, log_parameter_max_length_on_error=0]
+    networks: [backend]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: galaxy
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, app_db_password]
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-galaxy.sh:ro
+    # PostgreSQL has no published port.
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d galaxy"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+  migrate:
+    image: ${GALAXY_IMAGE:?Set the verified immutable application image}
+    profiles: [ops]
+    networks: [backend]
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/database_url
+    secrets: [database_url]
+    command: [node, dist/db/migrate.js]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+networks:
+  backend:
+    internal: true
+  public:
+volumes:
+  postgres-data:
+secrets:
+  database_url:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/database_url
+  encryption_key:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/encryption_key
+  discord_bot_token:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/discord_bot_token
+  discord_client_secret:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/discord_client_secret
+  postgres_password:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/postgres_password
+  app_db_password:
+    file: ${GALAXY_SECRETS_DIR:?Set the local secret directory}/app_db_password

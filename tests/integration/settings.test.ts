@@ -36,7 +36,7 @@ describe('settings/credentials against isolated PostgreSQL', () => {
   });
   beforeEach(async () => {
     departed = roleRevoked = lookupFails = false; catalogAvailable = true;
-    await database.pool.query('TRUNCATE guild_settings, approved_guilds, audit_events CASCADE');
+    await database.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings, approved_guilds, audit_events CASCADE');
     for (const id of [guild, other]) {
       await database.pool.query('INSERT INTO guild_settings(guild_id) VALUES ($1)', [id]);
       await service.setApproval(creator, id, true);

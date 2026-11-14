@@ -37,7 +37,7 @@ async function state() { return (await db.pool.query('SELECT * FROM channel_stat
 describe('durable message activity and assessment snapshots',() => {
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); rawRepository = new AutomaticRepository(db); });
   beforeEach(async () => {
-    await db.pool.query('TRUNCATE guild_settings,approved_guilds CASCADE');
+    await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds CASCADE');
     await db.pool.query("INSERT INTO worker_ownership(name,token) VALUES('conversation',$1) ON CONFLICT(name) DO UPDATE SET token=EXCLUDED.token",[epoch]);
     await db.pool.query('INSERT INTO guild_settings(guild_id,enabled,direct_enabled,auto_threshold) VALUES($1,true,true,3)',[guild]);
     await db.pool.query('INSERT INTO approved_guilds(guild_id,approved_by) VALUES($1,$1)',[guild]);

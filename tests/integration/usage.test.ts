@@ -24,7 +24,7 @@ async function totals(day = '2026-11-13') { return (await db.pool.query('SELECT 
 describe('atomic usage reservations and settlement', () => {
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); usage = new UsageService(db); });
   beforeEach(async () => {
-    await db.pool.query('TRUNCATE guild_settings,approved_guilds,web_sessions,audit_events CASCADE');
+    await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds,web_sessions,audit_events CASCADE');
     for (const id of [guild,other]) {
       await db.pool.query('INSERT INTO guild_settings(guild_id,enabled) VALUES($1,true)',[id]);
       await db.pool.query('INSERT INTO approved_guilds(guild_id,approved_by) VALUES($1,$1)',[id]);

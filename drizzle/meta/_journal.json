@@ -50,6 +50,13 @@
       "when": 1794669483801,
       "tag": "0006_wakeful_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794674073447,
+      "tag": "0007_material_ricochet",
+      "breakpoints": true
     }
   ]
 }

@@ -58,7 +58,7 @@ export const accessGrants = pgTable('access_grants', {
 }, (t) => [primaryKey({ columns: [t.guildId, t.subjectType, t.subjectId] }), check('access_subject_type', sql`${t.subjectType} IN ('user','role')`)]);
 // Usage belongs to the guild, not the credential row: replacing/removing a key cannot reset spend.
 export const dailyUsage = pgTable('daily_usage', {
-  guildId: guildId(), provider: provider(), utcDate: date('utc_date', { mode: 'string' }).notNull(),
+  guildId: text('guild_id').notNull(), provider: provider(), utcDate: date('utc_date', { mode: 'string' }).notNull(),
   inputTokens: counter('input_tokens'), outputTokens: counter('output_tokens'), reasoningTokens: counter('reasoning_tokens'), totalTokens: counter('total_tokens'),
   uncertainTokens: counter('uncertain_tokens'), reservedTokens: counter('reserved_tokens'), requests: counter('requests'),
 }, (t) => [
@@ -66,7 +66,7 @@ export const dailyUsage = pgTable('daily_usage', {
   check('daily_usage_nonnegative', sql`${t.provider} IN ('openai','google') AND ${t.inputTokens} >= 0 AND ${t.outputTokens} >= 0 AND ${t.reasoningTokens} >= 0 AND ${t.totalTokens} >= 0 AND ${t.uncertainTokens} >= 0 AND ${t.reservedTokens} >= 0 AND ${t.requests} >= 0`),
 ]);
 export const usageReservations = pgTable('usage_reservations', {
-  id: uuid('id').defaultRandom().primaryKey(), guildId: guildId(), provider: provider(), utcDate: date('utc_date', { mode: 'string' }).notNull(),
+  id: uuid('id').defaultRandom().primaryKey(), guildId: text('guild_id').notNull(), provider: provider(), utcDate: date('utc_date', { mode: 'string' }).notNull(),
   configurationKey: text('configuration_key'), configurationRevision: integer('configuration_revision'),
   knownInput: bigint('known_input', { mode: 'bigint' }), knownOutput: bigint('known_output', { mode: 'bigint' }),
   knownReasoning: bigint('known_reasoning', { mode: 'bigint' }), knownTotal: bigint('known_total', { mode: 'bigint' }),
@@ -74,7 +74,7 @@ export const usageReservations = pgTable('usage_reservations', {
   attemptId: uuid('attempt_id').notNull().unique(), createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
 }, (t) => [check('reservation_known_counts',sql`(${t.knownInput} IS NULL AND ${t.knownOutput} IS NULL AND ${t.knownReasoning} IS NULL AND ${t.knownTotal} IS NULL) OR (${t.knownInput} IS NOT NULL AND ${t.knownOutput} IS NOT NULL AND ${t.knownReasoning} IS NOT NULL AND ${t.knownTotal} IS NOT NULL AND ${t.knownInput} >= 0 AND ${t.knownOutput} >= 0 AND ${t.knownReasoning} >= 0 AND ${t.knownReasoning} <= ${t.knownOutput} AND ${t.knownTotal} = ${t.knownInput}+${t.knownOutput})`),check('reservation_bounds', sql`${t.reserved} >= 0 AND ${t.provider} IN ('openai','google') AND ${t.state} IN ('reserved','known','uncertain','not_sent')`), index('reservation_guild_bucket').on(t.guildId,t.provider,t.utcDate)]);
 export const requestReceipts = pgTable('request_receipts', {
-  guildId: guildId(), eventId: text('event_id').notNull(), state: text('state', { enum: ['accepted', 'processing', 'completed', 'uncertain', 'failed'] }).default('accepted').notNull(),
+  guildId: text('guild_id').notNull(), eventId: text('event_id').notNull(), state: text('state', { enum: ['accepted', 'processing', 'completed', 'uncertain', 'failed'] }).default('accepted').notNull(),
   createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.guildId, t.eventId] }), check('receipt_state', sql`${t.state} IN ('accepted','processing','completed','uncertain','failed')`)]);
 export const webSessions = pgTable('web_sessions', {

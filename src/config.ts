@@ -38,7 +38,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     const url = new URL(publicOrigin);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/' || (nodeEnv === 'production' && url.protocol !== 'https:')) invalid.add('PUBLIC_ORIGIN');
   } catch { invalid.add('PUBLIC_ORIGIN'); }
-  const contactUrl = env.CONTACT_URL;
+  const contactUrl = env.CONTACT_URL || undefined;
   if (contactUrl !== undefined && !validContactUrl(contactUrl)) invalid.add('CONTACT_URL');
   const databaseUrl = env.DATABASE_URL;
   if (databaseUrl !== undefined) {

@@ -1,8 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { resolveSecrets } from '../ops/secrets.js';
 import { createDatabase } from './index.js';
 
-const url = process.env.DATABASE_URL;
+let url: string | undefined;
+try { url = (await resolveSecrets(process.env)).DATABASE_URL; } catch { console.error('Database secret could not be loaded.'); }
 if (!url) {
   console.error('DATABASE_URL is required for explicit migrations');
   process.exitCode = 1;
