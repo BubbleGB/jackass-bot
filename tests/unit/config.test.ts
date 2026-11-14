@@ -51,5 +51,9 @@ describe('loadConfig', () => {
   it('rejects unknown runtime modes and database protocols', () => {
     expect(() => loadConfig({ APP_MODE: 'runntime' })).toThrow(/APP_MODE/);
     expect(() => loadConfig({ DATABASE_URL: 'https://localhost/db' })).toThrow(/DATABASE_URL/);
+  });  it('keeps contact optional, accepts a supplied HTTPS link and rejects executable or credential-bearing links',() => {
+    expect(loadConfig({ CONTACT_URL: 'https://example.test/contact' }).contactUrl).toBe('https://example.test/contact');
+    for (const contact of ['javascript:alert(1)','https://private-secret@example.test','http://example.test/contact']) expect(() => loadConfig({ CONTACT_URL: contact })).toThrow('CONTACT_URL');
   });
+
 });

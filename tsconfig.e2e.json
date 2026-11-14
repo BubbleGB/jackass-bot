@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "compilerOptions": { "rootDir": ".", "outDir": ".tools/e2e" }, "include": ["src/**/*.ts", "tests/helpers/dashboard-server.ts", "tests/helpers/web-fixture.ts", "tests/helpers/test-database-url.ts"] }

@@ -100,3 +100,9 @@ export const providerHealth = pgTable('provider_health', {
   guildId: guildId(), provider: provider(), configurationRevision: integer('configuration_revision').notNull(), configurationKey: text('configuration_key').notNull(),
   failures: integer('failures').default(0).notNull(), blocked: boolean('blocked').default(false).notNull(), nextRetryAt: time('next_retry_at'),
 }, t => [primaryKey({ columns: [t.guildId,t.provider] }),check('provider_health_bounds',sql`${t.provider} IN ('openai','google') AND ${t.failures} BETWEEN 0 AND 30 AND ${t.configurationRevision} > 0 AND ${t.configurationKey} ~ '^[0-9a-f]{64}$'`)]);
+
+// One-use OAuth authorization state, bound to a separate browser cookie; no tokens.
+export const oauthStates = pgTable('oauth_states', {
+  stateHash: text('state_hash').primaryKey(), browserHash: text('browser_hash').notNull(),
+  returnTo: text('return_to').notNull(), expiresAt: time('expires_at').notNull(),
+});
