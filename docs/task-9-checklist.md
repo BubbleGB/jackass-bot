@@ -1,13 +1,17 @@
 # Task 9: deployment inputs and live acceptance
 
-Task 8 does not authorise these actions. Obtain a separate Task 9 instruction before
-production credentials, registry release, DNS, VPS access or deployment. The supplied
+Repository-only Task 9 deployment preparation is authorised on `feat/task-9-deployment`:
+Compose/Traefik configuration, documentation and isolated dummy-value validation only.
+PR #8 merged as `126e4f8`. Production credentials, registry release, DNS changes, VPS
+connections and deployment still require separate instruction. The supplied
 Galaxy Neegy logo is already bundled; no further artwork input is required.
 
 ## Inputs and host inventory
 
 - Confirm Discord application, creator, test guild and channel IDs, creator contact link,
-  intended public HTTPS origin and OAuth redirect (`/auth/discord/callback`).
+  public origin `https://galaxy.bubbleaio.uk` and exact OAuth redirect
+  `https://galaxy.bubbleaio.uk/auth/discord/callback`. The hostname is selected; DNS and
+  Discord portal configuration are not yet performed.
 - Supply production bot/OAuth credentials, provider keys and encryption key through the
   selected secret store only, plus separate application/admin database passwords. Decide
   filesystem ownership, backup-key custody and future credential rotation procedures.
@@ -15,8 +19,15 @@ Galaxy Neegy logo is already bundled; no further artwork input is required.
   digest for the tested commit. No registry publication is configured by Task 8.
 - Choose encrypted off-VPS backup destination, encryption key, schedule and maximum
   7-day retention. Implement and test an isolated restore before enabling AI.
-- Verify SSH host identity and inspect existing containers, ports, proxy, disk, networks,
-  Watchtower and Stremio services read-only before proposing project-scoped changes.
+- Initial owner-supplied inventory confirms Ubuntu ARM64, Docker 29.6.2, Compose 5.3.1,
+  167 GB free and existing Traefik on `aio_network`, with the aio stack at
+  `/opt/docker/compose.yaml`. Watchtower's effective mode remains **unconfirmed**.
+  SSH host identity and selected routing/TLS/updater details still need verification
+  after separate authorisation; no agent connection to the VPS has occurred.
+- Validate `compose.yaml` + `compose.production.yaml` as project `galaxy-neegy`:
+  `npm run test:compose` verifies no published ports and only app on `aio_network`.
+  PostgreSQL/migrator remain private, Traefik-disabled and Watchtower-excluded.
+  Never modify the existing aio Compose project to add Galaxy.
 - Present the exact project-only deployment/HTTPS/DNS/migration plan. Do not prune
   globally, replace existing services, expose PostgreSQL or perform unrelated upgrades.
 
@@ -42,7 +53,8 @@ Galaxy Neegy logo is already bundled; no further artwork input is required.
 - On a physical Android phone, inspect landing/server/editor/privacy at normal and large
   text sizes: navigation, keyboard, scrolling, Save reachability, errors, conflict recovery
   and confirmation. CI's 390px Chromium viewport is not a physical-device result.
-- Verify TLS/certificates, loopback HTTP proxy routing, private database, secret file access,
+- Verify TLS/certificates, Traefik-to-app routing on `aio_network` with no host ports,
+  private database, secret file access,
   read-only/non-root app, Watchtower exclusions, readiness and graceful stop on the actual
   ARM64 host. Check other existing services remain healthy.
 - Record image digest, migration head and test evidence. Verify restore and schema-aware
@@ -51,3 +63,7 @@ Galaxy Neegy logo is already bundled; no further artwork input is required.
 
 Enable other servers only after the owner accepts these results. No Task 9 item is
 marked passed by Task 8's mocked tests.
+
+The exact two-file operator commands, requested Traefik labels and staged release/DNS/
+secrets/backup/restore procedure are in [the runbook](runbook.md). No live checklist item
+is passed by a rendered configuration or isolated image test.

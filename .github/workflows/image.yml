@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: .node-version
+      - name: Validate merged production Compose with dummy values
+        run: npm run test:compose
       - name: Build production image natively (no registry publication)
         run: docker build --tag galaxy-image:test .
       - name: Exercise production entry point and packaged assets

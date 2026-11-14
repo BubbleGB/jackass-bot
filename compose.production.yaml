@@ -1,0 +1,33 @@
+# Use explicitly after compose.yaml; never merge with the existing aio stack.
+services:
+  app:
+    # Empty lists merge with inherited ports; !reset removes the base loopback mapping.
+    ports: !reset []
+    networks: !override [backend, aio_network]
+    environment:
+      PORT: "3000"
+      PUBLIC_ORIGIN: https://galaxy.bubbleaio.uk
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: aio_network
+      traefik.http.routers.galaxy-neegy.rule: Host(`galaxy.bubbleaio.uk`)
+      traefik.http.routers.galaxy-neegy.entrypoints: websecure
+      traefik.http.routers.galaxy-neegy.tls: "true"
+      traefik.http.routers.galaxy-neegy.tls.certresolver: letsencrypt
+      traefik.http.routers.galaxy-neegy.service: galaxy-neegy
+      traefik.http.services.galaxy-neegy.loadbalancer.server.port: "3000"
+      com.centurylinklabs.watchtower.enable: "false"
+  postgres:
+    ports: !reset []
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+  migrate:
+    ports: !reset []
+    labels:
+      traefik.enable: "false"
+      com.centurylinklabs.watchtower.enable: "false"
+networks:
+  aio_network:
+    name: aio_network
+    external: true
