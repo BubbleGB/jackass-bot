@@ -29,6 +29,20 @@
       "when": 1794603890537,
       "tag": "0003_chief_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794650930282,
+      "tag": "0004_next_proemial_gods",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794652171700,
+      "tag": "0005_fine_kid_colt",
+      "breakpoints": true
     }
   ]
 }

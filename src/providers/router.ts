@@ -15,9 +15,10 @@ async function bounded<T>(run: () => Promise<T>,signal: AbortSignal): Promise<T>
     return await Promise.race([Promise.resolve().then(run),cancelled]);
   } finally { signal.removeEventListener('abort',abort); }
 }
+export interface ProviderControls { signal?: AbortSignal; beforeSend?: () => Promise<void> }
 export class ProviderRouter {
   constructor(private readonly repository: ProviderRepository,private readonly usage: Pick<UsageService,'reserveUsage' | 'settleUsage'>,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date()) {}
-  async generateWithFallback(request: BotRequest,input: GenerationInput,expectedRevision?: number): Promise<GenerationResult> {
+  async generateWithFallback(request: BotRequest,input: GenerationInput,expectedRevision?: number,controls?: ProviderControls): Promise<GenerationResult> {
     if (!isSnowflake(request.guildId) || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id)) throw new ProviderFailure('configuration','invalid_request',{ notSent: true });
     if (!await this.repository.claim(request.guildId,request.id)) throw new ProviderFailure('configuration','request_not_claimed',{ notSent: true });
     // Freeze caller-owned conversation data for count/generation consistency; never persist it.
@@ -35,17 +36,24 @@ export class ProviderRouter {
         if (candidate.blocked || candidate.retryAt > this.now().getTime()) continue;
         const adapter = this.adapters.get(candidate.provider); if (!adapter) continue;
         const attemptId = randomUUID(),controller = new AbortController();
+        const signal = controls?.signal ? AbortSignal.any([controller.signal,controls.signal]) : controller.signal;
+        const checkpoint = async () => {
+          if (signal.aborted) throw new ProviderFailure('transient','worker_unavailable',{ notSent: true });
+          try { await bounded(async () => { await controls?.beforeSend?.(); },signal); } catch (e) { if (e instanceof ProviderFailure) throw e; throw new ProviderFailure('transient','worker_unavailable',{ notSent: true }); }
+          if (signal.aborted) throw new ProviderFailure('transient','worker_unavailable',{ notSent: true });
+        };
         const timer = setTimeout(() => controller.abort(),60000);
         let reservation: Awaited<ReturnType<UsageService['reserveUsage']>> = null;
         let generationStarted = false,receivedResult = false;
         let phase: 'prepare' | 'reserve' | 'generate' | 'bookkeeping' = 'prepare';
         try {
           if (!await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
+          await checkpoint();
           let credential: string;
           try { credential = this.cipher.open(request.guildId,candidate.provider,candidate); } catch { throw new ProviderFailure('configuration','credential_invalid',{ notSent: true }); }
           const generation: GenerationInput = { ...immutable,instructions: config.instructions,mode: request.source === 'automatic' ? (config.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional') : 'direct',modelId: candidate.modelId,maxGenerationTokens: config.maxGenerationTokens };
           if (candidate.effort !== null) generation.effort = candidate.effort; else delete generation.effort;
-          const estimate = await bounded(() => adapter.estimateUsage(generation,credential,controller.signal),controller.signal);
+          const estimate = await bounded(() => adapter.estimateUsage(generation,credential,signal),signal);
           // Recheck the current full-input ceiling even if this provider was skipped
           // during context sizing and became eligible after backoff/funding recovery.
           if (!Number.isSafeInteger(estimate) || estimate < generation.maxGenerationTokens) throw new ProviderFailure('uncertain','invalid_usage',{ notSent: true });
@@ -54,9 +62,10 @@ export class ProviderRouter {
           reservation = await this.usage.reserveUsage(request.guildId,candidate.provider,attemptId,estimate,this.now());
           if (!reservation) continue;
           phase = 'prepare';
-          if (controller.signal.aborted || !await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
+          if (signal.aborted || !await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
+          await checkpoint();
           generationStarted = true; anyGenerationStarted = true; phase = 'generate';
-          const result = await bounded(() => adapter.generate(generation,credential,controller.signal),controller.signal);
+          const result = await bounded(() => adapter.generate(generation,credential,signal),signal);
           receivedResult = true; phase = 'bookkeeping';
           if (result.usage.certainty === 'reported') await this.usage.settleUsage(reservation.id,result.usage,'known');
           else { uncertain = true; await this.usage.settleUsage(reservation.id,null,'uncertain'); }
@@ -72,6 +81,7 @@ export class ProviderRouter {
             if (outcome === 'uncertain') uncertain = true;
             await this.usage.settleUsage(reservation.id,error.usage ?? null,outcome);
           }
+          if (controls?.signal?.aborted || error.safeCode === 'worker_unavailable') throw new ProviderFailure('uncertain','worker_unavailable');
           if (error.safeCode === 'configuration_changed') throw error;
           await this.repository.failure(request.guildId,candidate,error,this.now(),attemptId);
           if (error.safeCode === 'provider_rejected') throw error;

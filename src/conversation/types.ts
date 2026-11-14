@@ -1,7 +1,7 @@
 import type { BotRequest,ContextMessage,GenerationInput,ProviderId } from '../domain/types.js';
 import type { GuildSettings } from '../settings/service.js';
 export class ConversationError extends Error {
-  constructor(code: 'context_unavailable' | 'context_limit' | 'configuration_changed' | 'direct_failed' | 'input_too_large' | 'no_usable_context' | 'context_check_limit') { super(code); this.name = 'ConversationError'; }
+  constructor(code: 'context_unavailable' | 'context_limit' | 'configuration_changed' | 'direct_failed' | 'input_too_large' | 'no_usable_context' | 'context_check_limit' | 'queue_full' | 'request_stale' | 'worker_stopped' | 'worker_unavailable') { super(code); this.name = 'ConversationError'; }
 }
 export interface HistoryMessage {
   id: string; guildId: string; channelId: string; authorId: string; authorBot: boolean;
@@ -29,12 +29,16 @@ export function validContextRequest(r: BotRequest): boolean {
 }
 export function validRequest(r: BotRequest): boolean { return validContextRequest(r) && r.source !== 'automatic'; }
 /** Whole-operation deadline even when an injected dependency ignores cancellation. */
-export async function contextOperation<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
-  const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
+export async function contextOperation<T>(run: (signal: AbortSignal) => Promise<T>,parent?: AbortSignal): Promise<T> {
+  const controller = new AbortController(),signal = parent ? AbortSignal.any([parent,controller.signal]) : controller.signal;
+  let timer: ReturnType<typeof setTimeout> | undefined,abort!: () => void;
   try {
-    return await Promise.race([run(controller.signal),new Promise<never>((_resolve,reject) => { timer = setTimeout(() => { controller.abort(); reject(new ConversationError('context_unavailable')); },conversationLimits.contextDeadlineMs); })]);
+    if (signal.aborted) throw new ConversationError('worker_unavailable');
+    const cancelled = new Promise<never>((_resolve,reject) => { abort = () => reject(new ConversationError(parent?.aborted ? 'worker_unavailable' : 'context_unavailable')); signal.addEventListener('abort',abort,{ once: true }); });
+    timer = setTimeout(() => controller.abort(),conversationLimits.contextDeadlineMs);
+    return await Promise.race([run(signal),cancelled]);
   } catch (e) { if (e instanceof ConversationError) throw e; throw new ConversationError('context_unavailable'); }
-  finally { clearTimeout(timer); controller.abort(); }
+  finally { clearTimeout(timer); if (abort) signal.removeEventListener('abort',abort); controller.abort(); }
 }
 export function humanTrigger(m: HistoryMessage | null,r: BotRequest): m is HistoryMessage {
   return !!m && m.id === r.id && m.guildId === r.guildId && m.channelId === r.channelId && m.authorId === r.userId && !m.authorBot && m.webhookId === null && (r.source === 'automatic' || (r.source === 'mention' ? m.mentionsBot : r.source === 'reply' && m.repliesToBot));

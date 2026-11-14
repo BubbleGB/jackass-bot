@@ -84,6 +84,18 @@ describe('bounded provider orchestration', () => {
     await expect(f.router().generateWithFallback(request,input)).rejects.toThrow('providers_unavailable');
     expect(f.settlements).toEqual(['openai:uncertain']);
   });
+  it('frees an unsent reservation when worker ownership is lost before generation',async () => {
+    const f = fixture(); let owned = true;
+    const reserve = f.usage.reserveUsage; f.usage.reserveUsage = async (...args) => { const r = await reserve(...args); owned = false; return r; };
+    await expect(f.router().generateWithFallback(request,input,undefined,{ beforeSend: async () => { if (!owned) throw new Error('private ownership details'); } })).rejects.toThrow('worker_unavailable');
+    expect(f.calls).toEqual([]); expect(f.settlements).toEqual(['openai:not_sent']); expect(f.failures).toEqual([]);
+  });
+  it('keeps uncertain usage and stops fallback if the worker loses ownership during generation',async () => {
+    const f = fixture(),controller = new AbortController();
+    f.adapters.get('openai')!.generate = async () => { controller.abort(); return new Promise(() => undefined); };
+    await expect(f.router().generateWithFallback(request,input,undefined,{ signal: controller.signal })).rejects.toThrow('worker_unavailable');
+    expect(f.settlements).toEqual(['openai:uncertain']); expect(f.calls).toEqual([]); expect(f.failures).toEqual([]);
+  });
   it('bounds an uncooperative generation to 60 seconds and keeps its reservation', async () => {
     vi.useFakeTimers();
     try {

@@ -1,5 +1,5 @@
 import type { ProviderError,NormalizedUsage } from '../domain/types.js';
-const SAFE_CODES = new Set(['invalid_usage','transport_uncertain','cancelled_before_send','unsupported_model','invalid_input','invalid_output','incomplete_response','input_too_large','unexpected_tools','provider_configuration','provider_rejected','provider_auth','provider_quota','provider_rate_limit','provider_transient','provider_error','invalid_request','request_not_claimed','guild_disabled','configuration_changed','providers_unavailable','credential_invalid','accounting_unavailable']);
+const SAFE_CODES = new Set(['invalid_usage','transport_uncertain','cancelled_before_send','unsupported_model','invalid_input','invalid_output','incomplete_response','input_too_large','unexpected_tools','provider_configuration','provider_rejected','provider_auth','provider_quota','provider_rate_limit','provider_transient','provider_error','invalid_request','request_not_claimed','guild_disabled','configuration_changed','providers_unavailable','credential_invalid','accounting_unavailable','worker_unavailable']);
 export class ProviderFailure extends Error implements ProviderError {
   readonly safeCode: string;
   readonly usage?: NormalizedUsage; readonly retryAfterMs?: number;

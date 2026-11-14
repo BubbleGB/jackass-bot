@@ -69,6 +69,14 @@ describe('curated model contracts and provider fixtures', () => {
     await expect(adapter.estimateUsage({ ...request,context: [...context,context[0]!] },'fake-key',signal())).rejects.toThrow('invalid_input');
     expect(calls).toBe(1);
   });
+  it('sends distinct explicit automatic participation policies in trusted instructions',async () => {
+    const instructions: string[] = [];
+    const adapter = new OpenAIAdapter(async r => { instructions.push(String(r.body.instructions)); return { status: 200,headers: {},body: { input_tokens: 120 } }; });
+    await adapter.estimateUsage({ ...input,mode: 'auto_always' },'fake-key',signal());
+    await adapter.estimateUsage({ ...input,mode: 'auto_conditional' },'fake-key',signal());
+    expect(instructions[0]).toContain('always contribute'); expect(instructions[1]).toContain('only when appropriate');
+    expect(instructions.every(text => text.includes('Server personality follows:') && text.includes('Be kind.'))).toBe(true);
+  });
   it('requires explicit structured silence, distinguishing empty transport output', async () => {
     expect((await new OpenAIAdapter(transport(openResponse('{"kind":"silence","text":""}'))).generate(input,'fake-key',signal())).kind).toBe('silence');
     await expect(new OpenAIAdapter(transport(openResponse(''))).generate(input,'fake-key',signal())).rejects.toMatchObject({ safeCode: 'invalid_output',usage: { totalTokens: 130 } });

@@ -7,15 +7,15 @@ const order = (a: ContextMessage,b: ContextMessage) => a.timestamp.getTime()-b.t
 export class ContextBuilder {
   constructor(private readonly history: HistorySource,private readonly countInput: InputCounter) {}
   /** Context construction only: no scheduling, activity counters or generation. */
-  async buildAutomaticContext(request: BotRequest,settings: GuildSettings): Promise<AutomaticContextResult> {
+  async buildAutomaticContext(request: BotRequest,settings: GuildSettings,parent?: AbortSignal): Promise<AutomaticContextResult> {
     if (request.source !== 'automatic') return { status: 'skipped',reason: 'context_unavailable' };
-    try { return { status: 'ready',context: await this.buildContext(request,settings) }; }
+    try { return { status: 'ready',context: await this.buildContext(request,settings,parent) }; }
     catch (e) {
       const reason = e instanceof ConversationError && ['input_too_large','no_usable_context','context_check_limit'].includes(e.message) ? e.message as 'input_too_large' | 'no_usable_context' | 'context_check_limit' : 'context_unavailable';
       return { status: 'skipped',reason };
     }
   }
-  async buildContext(request: BotRequest,settings: GuildSettings): Promise<ContextMessage[]> {
+  async buildContext(request: BotRequest,settings: GuildSettings,parent?: AbortSignal): Promise<ContextMessage[]> {
     return contextOperation(async signal => {
       const automatic = request.source === 'automatic';
       if (!validContextRequest(request) || settings.guildId !== request.guildId || !settings.enabled || (!automatic && !settings.directEnabled)) throw new ConversationError('context_unavailable');
@@ -90,7 +90,7 @@ export class ContextBuilder {
         context = context.filter(c => !remove.has(c.id));
       }
       throw new ConversationError(automatic ? 'context_check_limit' : 'input_too_large');
-    });
+    },parent);
   }
   private usable(m: HistoryMessage,r: BotRequest,allowOversized = false): boolean {
     return !!m && m.guildId === r.guildId && m.channelId === r.channelId && typeof m.id === 'string' && /^\d{1,20}$/.test(m.id) && typeof m.authorId === 'string' && /^\d{17,20}$/.test(m.authorId) && m.webhookId === null && typeof m.authorBot === 'boolean' && (!m.authorBot || m.authorId === this.history.botId) && typeof m.content === 'string' && (allowOversized || m.content.length <= conversationLimits.maxPromptCharacters) && m.timestamp instanceof Date && Number.isFinite(m.timestamp.getTime()) && m.timestamp.getTime() <= r.receivedAt.getTime();

@@ -1,6 +1,7 @@
 import { describe,it,expect } from 'vitest';
 import { DirectEligibility } from '../../src/conversation/eligibility.js';
 import { DirectService } from '../../src/conversation/direct.js';
+import { ConversationError } from '../../src/conversation/types.js';
 import { ContextBuilder } from '../../src/conversation/context.js';
 import { settings,request,source,instant,guild,channel,user,message } from '../helpers/conversation.js';
 import type { GenerationResult,GenerationInput } from '../../src/domain/types.js';
@@ -63,6 +64,16 @@ describe('server-wide direct request eligibility and lifecycle',() => {
     expect(outcome).toMatchObject({ status: 'input_too_large',message: expect.any(String) });
     expect(JSON.stringify(outcome)).not.toMatch(/private|fake-key/); expect(f.calls()).toBe(0);
     f.advance(5000); expect(await f.gate.acceptDirect(request)).toBe('accepted');
+  });
+  it('starts cooldown/outstanding admission before waiting in the shared queue and cleans a dropped job',async () => {
+    const f = fixture(); let release!: () => void;
+    const queued = f.service.handleDirect(request,run => new Promise((resolve,reject) => { release = async () => { try { resolve(await run()); } catch (e) { reject(e); } }; }));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(await f.gate.acceptDirect(request)).toBe('busy'); expect(f.calls()).toBe(0);
+    release(); await queued; expect(f.calls()).toBe(1);
+    f.advance(5000);
+    const dropped = f.service.handleDirect(request,async () => { throw new ConversationError('request_stale'); });
+    await expect(dropped).rejects.toThrow('request_stale'); f.advance(5000); expect(await f.gate.acceptDirect(request)).toBe('accepted');
   });
   it('rejects disabled/unapproved config, spoofed guilds, lost permissions and nonhuman triggers before providers',async () => {
     for (const mode of ['disabled','switch','guild','permissions','bot','webhook','not-mentioned'] as const) {
