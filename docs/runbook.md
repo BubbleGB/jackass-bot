@@ -211,7 +211,11 @@ These are preparations to review, not actions performed by this PR:
 1. Choose registry, visibility/access and approved source commit; separately authorise
    publication of tested native AMD64/ARM64 images, immutable commit tags and a manifest
    digest. Record the verified digest in `GALAXY_IMAGE`; no mutable `latest` deployment.
-   Existing CI builds/tests locally and never publishes. Host registry authentication,
+   Push/PR CI builds/tests locally and never publishes. The proposed manual-only
+   [registry release procedure](release.md) must be reviewed before first use; merging
+   it does not publish or deploy. It verifies exact-source CI, builds/smokes natively,
+   publishes tested archives and reports the observed index digest/platforms/pull access.
+   Host registry authentication,
    if needed, must be arranged through secret storage after authorisation.
 2. Separately authorise DNS for `galaxy.bubbleaio.uk` to the verified public Oracle
    address. The inventory's `10.0.0.214` is private and is not an Internet DNS target.

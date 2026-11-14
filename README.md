@@ -77,7 +77,10 @@ The [runbook](docs/runbook.md) states the exact paths and limitations.
 [Project CI](.github/workflows/checks.yml) runs lint, types, unit/database/browser tests,
 build, migration drift and foundation startup. [Image CI](.github/workflows/image.yml)
 builds and runs the production image on native AMD64 and ARM64 runners. All jobs use
-mocks/test credentials; none deploy or release to a registry. Consult the current PR's
+mocks/test credentials and never publish or deploy on push/merge. A separate manual-only
+[registry release workflow](.github/workflows/release.yml) and [procedure](docs/release.md)
+are proposed for review; no registry image has been published by that preparation.
+Consult the current PR's
 latest commit checks for observed results, rather than historical progress notes.
 
 ## Behaviour and service contracts

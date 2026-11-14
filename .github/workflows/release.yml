@@ -1,0 +1,166 @@
+name: Registry release
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Full 40-character merged main commit to release (never a branch/tag)
+        required: true
+        type: string
+      verify_only:
+        description: Verify an existing commit-tagged manifest without publishing
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: galaxy-registry-release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+env:
+  SOURCE_COMMIT: ${{ inputs.source_commit }}
+  CONTROL_COMMIT: ${{ github.sha }}
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source: ${{ steps.gate.outputs.source }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+      - name: Require exact main source and successful native source/control CI
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node deploy/release/cli.mjs gate
+  native:
+    needs: gate
+    if: ${{ !inputs.verify_only }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      SOURCE_COMMIT: ${{ needs.gate.outputs.source }}
+      ARCHITECTURE: ${{ matrix.architecture }}
+      ARCHIVE_FILE: ${{ github.workspace }}/image/image.tar.gz
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.gate.outputs.source }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: source/.node-version
+      - name: Verify source, build and smoke-test natively without registry credentials
+        working-directory: source
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          npm run test:compose
+          docker build --provenance=false --label "org.opencontainers.image.revision=$SOURCE_COMMIT" \
+            --label org.opencontainers.image.source=https://github.com/BubbleGB/jackass-bot \
+            --tag "galaxy-release:$ARCHITECTURE" .
+          set -o pipefail
+          npm run test:image -- "galaxy-release:$ARCHITECTURE" 2>&1 | tee "$GITHUB_WORKSPACE/image-test.log"
+      - name: Archive exactly the tested image and record its identity
+        run: |
+          mkdir image
+          docker save "galaxy-release:$ARCHITECTURE" | gzip -1 > "$ARCHIVE_FILE"
+          node control/deploy/release/cli.mjs record
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-image-${{ matrix.architecture }}
+          path: image/
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+      - name: Retain native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-smoke-${{ matrix.architecture }}
+          path: image-test.log
+          retention-days: 14
+  publish:
+    needs: [gate, native]
+    if: ${{ !inputs.verify_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      SOURCE_COMMIT: ${{ needs.gate.outputs.source }}
+      ARCHIVES_DIR: ${{ github.workspace }}/images
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-image-*
+          path: images
+      - name: Publish tested archives and create commit manifest (never rebuild)
+        run: node deploy/release/cli.mjs publish
+      - name: Remove ephemeral registry login
+        if: always()
+        run: docker logout ghcr.io
+  verify:
+    needs: [gate, native, publish]
+    if: ${{ always() && needs.gate.result == 'success' && (inputs.verify_only || needs.publish.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    env:
+      SOURCE_COMMIT: ${{ needs.gate.outputs.source }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+      - name: Verify registry bytes, platforms, source and anonymous pull
+        run: node deploy/release/cli.mjs verify
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: registry-verification
+          path: release-report.json
+          retention-days: 90
+          if-no-files-found: error

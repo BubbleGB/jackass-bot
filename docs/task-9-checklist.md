@@ -16,7 +16,11 @@ Galaxy Neegy logo is already bundled; no further artwork input is required.
   selected secret store only, plus separate application/admin database passwords. Decide
   filesystem ownership, backup-key custody and future credential rotation procedures.
 - Choose registry/release permissions and immutable architecture-specific or manifest
-  digest for the tested commit. No registry publication is configured by Task 8.
+  digest for the tested commit. PR #9 merged as `2268d0d`; its exact main checks,
+  including native ARM64 image smoke, pass. No publication procedure existed, so the
+  owner's fallback requires an unmerged [release-workflow PR](release.md) for review.
+  Proposed target is GHCR; no published digest, manifest platforms or VPS pull-access
+  result exists until the real manual registry verification completes.
 - Choose encrypted off-VPS backup destination, encryption key, schedule and maximum
   7-day retention. Implement and test an isolated restore before enabling AI.
 - Initial owner-supplied inventory confirms Ubuntu ARM64, Docker 29.6.2, Compose 5.3.1,
