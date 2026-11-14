@@ -23,16 +23,34 @@ jobs:
       - name: Validate merged production Compose with dummy values
         run: npm run test:compose
       - name: Build production image natively (no registry publication)
-        run: docker build --tag galaxy-image:test .
+        run: |
+          docker build --provenance=false --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label org.opencontainers.image.source=https://github.com/BubbleGB/jackass-bot \
+            --tag galaxy-image:test .
       - name: Exercise production entry point and packaged assets
         shell: bash
         run: |
           set -o pipefail
           npm run test:image -- galaxy-image:test 2>&1 | tee image-test.log
+      - name: Verify tested image archive round-trip without publishing
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          ARCHIVE_FILE: ${{ runner.temp }}/native-image/image.tar.gz
+        run: |
+          set -o pipefail
+          export ARCHITECTURE
+          ARCHITECTURE=$(node -p "process.arch === 'arm64' ? 'arm64' : 'amd64'")
+          mkdir -p "$(dirname "$ARCHIVE_FILE")"
+          docker tag galaxy-image:test "galaxy-release:$ARCHITECTURE"
+          docker save "galaxy-release:$ARCHITECTURE" | gzip -1 > "$ARCHIVE_FILE"
+          node deploy/release/cli.mjs record
+          node deploy/release/cli.mjs roundtrip
       - name: Retain image test evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-image-${{ matrix.runner }}
-          path: image-test.log
+          path: |
+            image-test.log
+            ${{ runner.temp }}/native-image/proof.json
           retention-days: 14
