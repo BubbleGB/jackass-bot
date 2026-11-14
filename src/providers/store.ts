@@ -8,7 +8,7 @@ export interface Candidate extends CredentialEnvelope {
   provider: ProviderId; modelId: string; effort: string | null; revision: number; configurationKey: string;
   blocked: boolean; retryAt: number; failures: number;
 }
-export interface RoutingConfig { revision: number; instructions: string; maxGenerationTokens: number; autoPolicy: 'always' | 'conditional'; candidates: Candidate[] }
+export interface RoutingConfig { revision: number; instructions: string; contextTokenLimit: number; maxGenerationTokens: number; autoPolicy: 'always' | 'conditional'; candidates: Candidate[] }
 export interface ProviderRepository {
   claim(guildId: string,requestId: string): Promise<boolean>;
   finish(guildId: string,requestId: string,state: 'completed' | 'failed' | 'uncertain'): Promise<void>;
@@ -47,7 +47,7 @@ export class PostgresProviderRepository implements ProviderRepository {
         const key = configurationKey(e),same = key === row.health_key;
         return { ...e,provider: row.provider as ProviderId,revision: row.revision as number,configurationKey: key,blocked: same && row.blocked === true,retryAt: same && row.next_retry_at ? (row.next_retry_at as Date).getTime() : 0,failures: same ? row.failures as number : 0 };
       });
-      return { revision: settings.revision,instructions: settings.instructions,maxGenerationTokens: settings.max_generation_tokens,autoPolicy: settings.auto_policy,candidates };
+      return { revision: settings.revision,instructions: settings.instructions,contextTokenLimit: settings.context_token_limit,maxGenerationTokens: settings.max_generation_tokens,autoPolicy: settings.auto_policy,candidates };
     });
   }
   async current(guildId: string,config: RoutingConfig,candidate: Candidate): Promise<boolean> {

@@ -17,15 +17,16 @@ async function bounded<T>(run: () => Promise<T>,signal: AbortSignal): Promise<T>
 }
 export class ProviderRouter {
   constructor(private readonly repository: ProviderRepository,private readonly usage: Pick<UsageService,'reserveUsage' | 'settleUsage'>,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date()) {}
-  async generateWithFallback(request: BotRequest,input: GenerationInput): Promise<GenerationResult> {
+  async generateWithFallback(request: BotRequest,input: GenerationInput,expectedRevision?: number): Promise<GenerationResult> {
     if (!isSnowflake(request.guildId) || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id)) throw new ProviderFailure('configuration','invalid_request',{ notSent: true });
     if (!await this.repository.claim(request.guildId,request.id)) throw new ProviderFailure('configuration','request_not_claimed',{ notSent: true });
     // Freeze caller-owned conversation data for count/generation consistency; never persist it.
-    let uncertain = false;
+    let uncertain = false,inputRejected = false,anyGenerationStarted = false;
     try {
       let immutable: GenerationInput;
       try { immutable = structuredClone(input); } catch { throw new ProviderFailure('configuration','invalid_input',{ notSent: true }); }
       const config = await this.repository.load(request.guildId,this.now());
+      if (expectedRevision !== undefined && config?.revision !== expectedRevision) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
       if (!config) throw new ProviderFailure('configuration','guild_disabled',{ notSent: true });
       // At most one pass over each provider, regardless of malformed injected config.
       const tried = new Set<ProviderId>();
@@ -45,12 +46,16 @@ export class ProviderRouter {
           const generation: GenerationInput = { ...immutable,instructions: config.instructions,mode: request.source === 'automatic' ? (config.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional') : 'direct',modelId: candidate.modelId,maxGenerationTokens: config.maxGenerationTokens };
           if (candidate.effort !== null) generation.effort = candidate.effort; else delete generation.effort;
           const estimate = await bounded(() => adapter.estimateUsage(generation,credential,controller.signal),controller.signal);
+          // Recheck the current full-input ceiling even if this provider was skipped
+          // during context sizing and became eligible after backoff/funding recovery.
+          if (!Number.isSafeInteger(estimate) || estimate < generation.maxGenerationTokens) throw new ProviderFailure('uncertain','invalid_usage',{ notSent: true });
+          if (estimate-generation.maxGenerationTokens > config.contextTokenLimit) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
           phase = 'reserve';
           reservation = await this.usage.reserveUsage(request.guildId,candidate.provider,attemptId,estimate,this.now());
           if (!reservation) continue;
           phase = 'prepare';
           if (controller.signal.aborted || !await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
-          generationStarted = true; phase = 'generate';
+          generationStarted = true; anyGenerationStarted = true; phase = 'generate';
           const result = await bounded(() => adapter.generate(generation,credential,controller.signal),controller.signal);
           receivedResult = true; phase = 'bookkeeping';
           if (result.usage.certainty === 'reported') await this.usage.settleUsage(reservation.id,result.usage,'known');
@@ -61,6 +66,7 @@ export class ProviderRouter {
         } catch (raw) {
           if (receivedResult || phase === 'reserve' || raw instanceof UsageError) { uncertain = true; throw new ProviderFailure('uncertain','accounting_unavailable'); }
           const error = raw instanceof ProviderFailure ? raw : new ProviderFailure('uncertain','provider_error');
+          if (error.safeCode === 'input_too_large') inputRejected = true;
           if (reservation) {
             const outcome = error.usage?.certainty === 'reported' ? 'known' : !generationStarted || error.notSent ? 'not_sent' : 'uncertain';
             if (outcome === 'uncertain') uncertain = true;
@@ -71,6 +77,7 @@ export class ProviderRouter {
           if (error.safeCode === 'provider_rejected') throw error;
         } finally { clearTimeout(timer); controller.abort(); }
       }
+      if (inputRejected && !anyGenerationStarted) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
       throw new ProviderFailure('quota','providers_unavailable');
     } catch (error) {
       await this.repository.finish(request.guildId,request.id,uncertain ? 'uncertain' : 'failed');
