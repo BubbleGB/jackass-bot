@@ -1,5 +1,6 @@
 import type { AccessLevel } from '../domain/types.js';
 import type { MembershipRepository, MembershipSnapshot } from './discord-membership.js';
+import { MembershipVerificationError,type VerificationReason } from './discord-membership.js';
 export type AccessAction = 'read' | 'settings' | 'lowerAllowance' | 'raiseAllowance' | 'credentials' | 'grants';
 export interface AccessGrant { subjectType: 'user' | 'role'; subjectId: string }
 export interface AccessRepository {
@@ -7,7 +8,7 @@ export interface AccessRepository {
   grants(guildId: string): Promise<readonly AccessGrant[]>;
 }
 export class SettingsError extends Error {
-  constructor(public readonly code: 'forbidden' | 'invalid_settings' | 'revision_conflict' | 'not_configured' | 'storage_failed' | 'credential_invalid') { super(code); this.name = 'SettingsError'; }
+  constructor(public readonly code: 'forbidden' | 'invalid_settings' | 'revision_conflict' | 'not_configured' | 'storage_failed' | 'credential_invalid' | 'verification_unavailable',readonly reason?: VerificationReason) { super(code); this.name = 'SettingsError'; }
 }
 export const isSnowflake = (id: unknown): id is string => typeof id === 'string' && /^\d{17,20}$/.test(id);
 export function can(level: AccessLevel, action: AccessAction): boolean {
@@ -23,7 +24,7 @@ export class AccessPolicy {
       const m = await this.membership.lookup(userId, guildId);
       if (!m || m.guildId !== guildId || m.userId !== userId || !m.botPresent) return null;
       return m;
-    } catch { return null; }
+    } catch (e) { throw new SettingsError('verification_unavailable',e instanceof MembershipVerificationError ? e.reason : 'unavailable'); }
   }
   async resolveAccess(userId: string, guildId: string, repository = this.repository): Promise<AccessLevel> {
     try {
@@ -37,7 +38,7 @@ export class AccessPolicy {
       if (member.roles.some(role => assigned.has(role.id) && (BigInt(role.permissions) & 8n) !== 0n)) return 'admin';
       const grants = await repository.grants(guildId);
       return grants.some(g => (g.subjectType === 'user' && g.subjectId === userId) || (g.subjectType === 'role' && assigned.has(g.subjectId) && current.has(g.subjectId))) ? 'delegate' : 'none';
-    } catch { return 'none'; }
+    } catch (e) { if (e instanceof SettingsError) throw e; throw new SettingsError('storage_failed'); }
   }
   async require(actorId: string, guildId: string, action: AccessAction, repository = this.repository): Promise<AccessLevel> {
     const level = await this.resolveAccess(actorId, guildId, repository);

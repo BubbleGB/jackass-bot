@@ -143,3 +143,10 @@ link integration with the installed bot. Mobile emulation is not a physical-devi
 No production credentials, live registration, paid calls, DNS changes, VPS or deployment
 are part of Task 7. Expired session cleanup/retention jobs and integrated startup belong
 to Task 8; expired rows already fail authentication and old states are pruned on new login.
+## Access verification and retry
+
+The settings editor starts four concurrent reads and then loads grants for managers.
+Temporary Discord verification failures use 503 `verification_unavailable`, distinct
+from genuine 403 denial. Initial loading and grants listing have read-only retry controls;
+grants retries preserve unsaved settings. Membership/roles/approval are still checked
+afresh for each protected operation. See [the investigation and live-check limits](settings-access-investigation.md).

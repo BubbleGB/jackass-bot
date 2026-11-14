@@ -174,6 +174,11 @@ Fatal uncaught exceptions or unhandled rejections trigger a sanitised nonzero sh
 the runtime does not continue serving after such a fault. PostgreSQL is configured to
 omit SQL statements, parameters and detailed error rows from its logs.
 Use private dashboard error codes for diagnosis; do not enable request-body logging.
+For intermittent dashboard access warnings, see [the reproduced settings-load sequence](settings-access-investigation.md).
+Failed protected API reads/writes emit only route template, status, timingMs and category;
+temporary Discord verification failures are 503, while confirmed access denials remain
+403. Capture only those four fields when checking a live failure; do not dump headers,
+cookies, environment variables, response bodies or raw Discord errors.
 Container/proxy retention and encrypted backups must be configured separately in Task 9.
 
 ## Reproduce image verification without external credentials

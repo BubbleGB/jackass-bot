@@ -35,7 +35,10 @@ request metadata follow the retention policy above after removal; reinstalling c
 erase current usage. Revoking approval disables the bot and deletes its credentials;
 reapproval does not automatically enable it.
 
-Runtime logs contain a fixed event name, timestamp and sometimes a fixed delivery state.
+Runtime lifecycle logs contain a fixed event name, timestamp and sometimes a fixed delivery state.
+Failed protected dashboard operations additionally log only the registered route template,
+HTTP status, elapsed milliseconds and a fixed error category. Templates contain no actual
+guild/user IDs; query strings and request bodies are excluded.
 No channel text, responses, keys, URLs, identifiers or raw exceptions are logged by the
 runtime. Operators must limit retention of container/proxy logs separately. No backup
 service is configured yet. Task 9 must implement encrypted off-host backups, a maximum
