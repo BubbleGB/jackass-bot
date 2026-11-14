@@ -18,7 +18,7 @@ async function login(f: Fixture,code = 'owner',returnTo = `/servers/${guildId}`,
 }
 describe('dashboard HTTP authentication and current authorization',() => {
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); });
-  beforeEach(async () => { await db.pool.query('TRUNCATE guild_settings,approved_guilds,web_sessions,oauth_states CASCADE'); });
+  beforeEach(async () => { await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds,web_sessions,oauth_states CASCADE'); });
   afterAll(async () => { await db?.close(); try { await admin.query(`DROP DATABASE IF EXISTS "${name}"`); } finally { await admin.end(); } });
   it('requires one-use browser-bound state, rotates the session and preserves the Task6 deep link',async () => {
     const f = await webFixture(db);

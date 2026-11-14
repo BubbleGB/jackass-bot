@@ -47,7 +47,7 @@ export class UsageService {
         // Estimates can be low. Record the full actual amount without changing the
         // allowance or permanently blocking a healthy configuration. Admission checks
         // include this amount and all other in-flight/uncertain usage.
-        await client.query("INSERT INTO operational_errors(guild_id,provider,safe_code,correlation_id) VALUES($1,$2,'usage_estimate_exceeded',$3)",[r.guild_id,r.provider,r.attempt_id]);
+        await client.query("INSERT INTO operational_errors(guild_id,provider,safe_code,correlation_id) SELECT guild_id,$2,'usage_estimate_exceeded',$3 FROM guild_settings WHERE guild_id=$1",[r.guild_id,r.provider,r.attempt_id]);
       }
     });
   }

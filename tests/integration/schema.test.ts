@@ -34,7 +34,7 @@ describe('migrations and guild deletion boundaries', () => {
     await migrate(db().db, { migrationsFolder: './drizzle' });
   });
   beforeEach(async () => {
-    await db().pool.query('TRUNCATE guild_settings, approved_guilds, web_sessions, audit_events CASCADE');
+    await db().pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings, approved_guilds, web_sessions, audit_events CASCADE');
     await seedGuild();
   });
   afterAll(async () => {
@@ -101,7 +101,7 @@ describe('migrations and guild deletion boundaries', () => {
     await expect(db().pool.query("INSERT INTO web_sessions (session_hash,user_id,token_ciphertext,expires_at) VALUES ($1,$2,$3,now()+interval '1 day')", ['a'.repeat(64),actor,Buffer.alloc(32)])).rejects.toMatchObject({ code: '23514' });
     await expect(db().pool.query('INSERT INTO web_sessions (session_hash,user_id,expires_at) VALUES ($1,$2,now())', ['b'.repeat(64),actor])).rejects.toMatchObject({ code: '23514' });
   });
-  it('deletes guild-owned data while retaining approvals, global sessions, approval audit and another guild', async () => {
+  it('deletes configuration while retaining accounting/receipts, approvals, global sessions and another guild', async () => {
     await seedGuild(otherGuild);
     await db().pool.query('INSERT INTO approved_guilds (guild_id,approved_by) VALUES ($1,$2)', [guild, actor]);
     await seedProvider();
@@ -115,9 +115,10 @@ describe('migrations and guild deletion boundaries', () => {
     await db().pool.query("INSERT INTO audit_events (guild_id,actor,action,changed_fields) VALUES ($1,$2,'settings.update',ARRAY['enabled']), (NULL,$2,'approval.add',ARRAY[]::text[])", [guild,actor]);
     await db().pool.query("INSERT INTO web_sessions (session_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '1 day')", ['a'.repeat(64),actor]);
     await db().pool.query('DELETE FROM guild_settings WHERE guild_id=$1', [guild]);
-    for (const table of ['provider_configs','auto_channels','channel_state','access_grants','daily_usage','usage_reservations','request_receipts','operational_errors']) {
+    for (const table of ['provider_configs','auto_channels','channel_state','access_grants','operational_errors']) {
       expect((await db().pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count, table).toBe('0');
     }
+    for (const table of ['daily_usage','usage_reservations','request_receipts']) expect((await db().pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count,table).toBe('1');
     expect((await db().pool.query('SELECT guild_id FROM approved_guilds')).rows).toEqual([{ guild_id: guild }]);
     expect((await db().pool.query('SELECT guild_id FROM guild_settings')).rows).toEqual([{ guild_id: otherGuild }]);
     expect((await db().pool.query('SELECT action FROM audit_events')).rows).toEqual([{ action: 'approval.add' }]);

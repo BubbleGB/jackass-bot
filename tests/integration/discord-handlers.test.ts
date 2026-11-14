@@ -16,7 +16,7 @@ const id = (n: number) => String(BigInt(request.id)+BigInt(n));
 describe('Discord handlers through existing context, queue, access and ledger services',() => {
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); });
   beforeEach(async () => {
-    await db.pool.query('TRUNCATE guild_settings,approved_guilds CASCADE');
+    await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds CASCADE');
     await db.pool.query('INSERT INTO guild_settings(guild_id,enabled,direct_enabled,auto_threshold) VALUES($1,true,true,3)',[guild]);
     await db.pool.query('INSERT INTO approved_guilds(guild_id,approved_by) VALUES($1,$1)',[guild]);
     await db.pool.query('INSERT INTO auto_channels(guild_id,channel_id) VALUES($1,$2)',[guild,channel]);

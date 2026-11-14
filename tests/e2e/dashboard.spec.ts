@@ -92,3 +92,7 @@ test('keeps provider drafts when another staff member removes that provider',asy
   await expect(page.getByRole('alert')).toContainText('Another staff member'); await page.getByRole('button',{ name: 'Keep my edits on latest revision' }).click();
   await expect(page.getByRole('alert')).toContainText('Your draft is kept'); await expect(page.getByLabel('OpenAI effort')).toHaveValue('high');
 });
+test('publishes retention and creator/provider access information without requiring login',async ({ page }) => {
+  await page.goto('/privacy'); await expect(page.getByRole('heading',{ name: 'Privacy, plainly.' })).toBeVisible();
+  await expect(page.getByText(/unresolved charges/i)).toBeVisible(); await expect(page.getByText(/creator.*currently.*member/i)).toBeVisible();
+});

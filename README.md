@@ -1,36 +1,22 @@
-# jackass-bot
-bot for aa
+# Galaxy Neegy
 
+A Discord bot and mobile dashboard with per-server access control, encrypted write-only
+provider credentials, bounded channel context, direct/automatic requests and daily usage
+safeguards. Development and testing use Codex Cloud; the Oracle ARM64 VPS remains the
+future deployment target. Tasks 1–7 are merged. Task 8 adds the integrated runtime and
+production package; deployment and live acceptance require separate Task 9 authorisation.
 
-## Galaxy Neegy — settings and access foundation
+`APP_MODE=foundation` validates configuration and exits without services. `APP_MODE=runtime`
+starts the Discord gateway, Fastify dashboard/API, database-backed single worker, health
+checks and daily maintenance. Runtime configuration requires credentials; do not enable it
+against live services during mocked tests. See the [approved handoff](docs/galaxy-neegy-handoff.md),
+[operations runbook](docs/runbook.md), [privacy policy](docs/privacy.md) and
+[remaining Task 9 inputs/checks](docs/task-9-checklist.md).
 
-A TypeScript foundation recovered from the phone and extended through Task 7 of the approved [handoff](docs/galaxy-neegy-handoff.md).
-The current program validates configuration and exits. HTTP/dashboard factories are available; integrated runtime activation remains Task 8.
-Task 2 adds backend access/settings/credential services. Task 3 adds provider adapters and
-atomic usage accounting; see [provider/accounting contracts and limitations](docs/providers-usage.md).
-Task 4 adds bounded channel context and direct eligibility/cooldowns; see
-[context and direct-request contracts](docs/context-direct.md).
-Task 5 adds durable activity/snapshot accounting and a bounded single-worker queue; see
-[automatic scheduling contracts](docs/automatic.md).
-Task 6 adds Discord gateway/command adapters and safe output delivery; see
-[Discord composition, acknowledgements and explicit registration](docs/discord.md).
-Task 7 adds Discord sign-in, protected HTTP routes and the mobile dashboard; see
-[dashboard setup, security, drafts and live-check limits](docs/dashboard.md).
-The services are tested with mocks and are not activated by foundation startup.
+## Install and verify in Cloud
 
-Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
-The Oracle ARM64 VPS remains an eventual deployment target; it is not a test database.
-The handoff includes the user’s revised allowance policy; its Termux paths and original
-progress record are historical. Daily token allowances are practical safeguards, not hard
-billing caps: estimation error and in-flight calls can overshoot them. Both providers use
-request-based preflight counts and reconcile full reported usage; allowances never increase automatically. See [recovery and verification](docs/task-1-verification.md) and
-[version compatibility](docs/compatibility.md).
-
-### Install and check
-
-Use Node **26.13.1** (Lithium LTS) and its bundled npm **11.20.0**.
-`.node-version`, `.nvmrc`, `package.json` and `.npmrc` enforce the chosen versions;
-activate them with your existing version manager before running npm.
+Use pinned Node **26.13.1** and bundled npm **11.20.0**. `.node-version`, `.nvmrc`,
+`package.json` and `.npmrc` enforce these versions. No production credentials are needed.
 
 ```sh
 node --version
@@ -43,68 +29,69 @@ npm run build
 npm start
 ```
 
-`npm start` loads `.env` if present and validates only. Do not set `APP_MODE=runtime`:
-service startup is reserved for later tasks and fails explicitly today. No production
-credentials are needed for foundation mode. Unit tests pass their own synthetic config.
-Dependency lifecycle scripts are disabled during installation; the lockfile supplies
-the platform packages used by Vitest and Drizzle.
+Foundation mode is the default. `.env.example` contains only public local-test values;
+never commit real `.env` files or secrets. Dependency lifecycle scripts are disabled.
+Migrations are explicit (`npm run db:migrate`); runtime checks the packaged migration
+head and refuses a mismatch. It never changes the schema at startup.
 
-### Isolated database tests
-
-Start only this project's disposable PostgreSQL instance in Cloud. The credentials
-below are public, local test credentials. The port is bound to loopback; the data is
-in tmpfs and disappears when the container is removed.
+## Isolated database and browser tests
 
 ```sh
 docker compose -f compose.dev.yaml up -d --wait
 export TEST_DATABASE_URL=postgresql://galaxy_test:galaxy_test@127.0.0.1:55432/galaxy_neegy_test
 npm run test:integration
+npx playwright install chromium
+npm run test:e2e
+npm run db:generate
 docker compose -f compose.dev.yaml down
 ```
 
-The integration suite never defaults to `DATABASE_URL`. It requires an explicit local
-PostgreSQL URL whose database name contains `test`, rejects query overrides, creates a
-uniquely named database, runs committed migrations twice, verifies constraints/deletion
-boundaries and drops that database in teardown. Its disposable DB user needs `CREATEDB`.
-Do not use production URLs, credentials, or the VPS for these tests.
+The development database is loopback-only with disposable tmpfs data. Tests require an
+explicit local URL whose database name contains `test`; they never use `DATABASE_URL` as
+fallback. Each suite creates/migrates/drops its own isolated database (test role needs
+`CREATEDB`). Do not substitute a production database or the VPS. Browser tests run at
+390px and desktop widths with fake Discord/provider services and real HTTP/access/settings
+services; CI retains screenshots/traces. Chromium emulation does not establish physical
+Android, live OAuth or HTTPS-cookie success.
 
-To inspect migrations on the disposable base database instead:
+## Production package verification
 
 ```sh
-npm run build
-DATABASE_URL=postgresql://galaxy_test:galaxy_test@127.0.0.1:55432/galaxy_neegy_test npm run db:migrate
-npm run db:generate
+docker build -t galaxy-image:test .
+npm run test:image -- galaxy-image:test
 ```
 
-`db:generate` is offline and should report no schema changes unless the schema changed.
-Commit generated SQL and snapshot/journal files together after review. Migrations run
-only through the explicit command; application startup does not run them.
+The multi-stage image pins Node by digest and runs as non-root. `compose.yaml` keeps
+PostgreSQL private, mounts secret files, excludes app/database from Watchtower and makes
+migrations an explicit operator step. The image smoke test uses temporary test credentials,
+a separate Compose project and mounted external-service fixtures. It executes the actual
+compiled entry point, database, dashboard/logo, singleton guard, event-to-accounting/delivery,
+graceful shutdown and crash recovery. It never publishes an image or calls a paid API.
+The [runbook](docs/runbook.md) states the exact paths and limitations.
 
-### Configuration and CI
+[Project CI](.github/workflows/checks.yml) runs lint, types, unit/database/browser tests,
+build, migration drift and foundation startup. [Image CI](.github/workflows/image.yml)
+builds and runs the production image on native AMD64 and ARM64 runners. All jobs use
+mocks/test credentials; none deploy or release to a registry. Consult the current PR's
+latest commit checks for observed results, rather than historical progress notes.
 
-`.env.example` documents optional foundation settings and the future required runtime
-fields. Copy it to a local `.env` only if needed; real `.env` files are ignored.
-Runtime mode requires a PostgreSQL URL, HTTPS public origin in production, a canonical
-base64 32-byte encryption key, Discord bot/OAuth credentials and creator snowflake.
-Config errors contain field names, never supplied values. Task 2 provides authenticated provider-key storage through the service layer;
-Task 7 exposes authenticated write-only key endpoints; no live worker is activated.
+## Behaviour and service contracts
 
-The read-only [checks workflow](.github/workflows/checks.yml) installs from the lockfile,
-runs lint/typecheck/unit/build/database checks, checks migration drift and smoke-tests
-foundation startup on native AMD64 and ARM64 Linux runners. It uses a fresh PostgreSQL
-service and no deployment secrets. Task 1 passed both architectures before PR #1 was squash-merged.
-Tasks 1–6 passed both architectures before merging. See the current PR for the latest
-dashboard/browser results; local checks alone never establish remote success.
+- [Settings/access](docs/settings-access.md) and [dashboard security](docs/dashboard.md):
+  current membership/roles on protected operations, creator approval and restricted delegates.
+- [Providers/accounting](docs/providers-usage.md): OpenAI and Google preflight count the
+  actual request where supported, reserve atomically and reconcile full reported usage.
+  **Daily allowances are practical safeguards, not hard billing caps.** Estimation errors
+  and in-flight calls can overshoot. Configured allowances never increase automatically.
+- [Context/direct requests](docs/context-direct.md): required instructions/current text
+  appear once and are never silently truncated; zero history still permits the current
+  question. Optional history trims first. Cooldown memory resets on restart for v1.
+- [Automatic scheduling](docs/automatic.md): durable counters, message deduplication and
+  one worker; no timer-only generation or replay of uncertain provider outcomes.
+- [Discord delivery](docs/discord.md): prompt acknowledgements, safe mentions, permission
+  rechecks, typing cleanup and bounded delivery-only retries. Command registration is
+  explicit and never runs on reconnect.
 
-`npm run test:e2e` runs Chromium mobile (390px) and desktop scenarios against real HTTP/
-access/settings services with fake Discord and isolated PostgreSQL. Run `npx playwright
-install chromium` once in Cloud; CI installs its browser on both architectures. Screenshots
-and failure traces are retained as workflow artifacts. No image publication or deployment
-workflow is present.
-
-Pending later inputs include application/creator/guild IDs, credentials through secret
-storage, contact link, registry access and an encrypted off-VPS
-backup destination. None is needed to run mocked checks. The supplied logo is now bundled locally. Task 7 is the current boundary; its PR stays unmerged. Live Discord login/registration,
-production credentials, VPS access and deployment require further instruction. Current direct text is separate from
-history caps and never silently truncated; oversized required input gets a typed rejection.
-The user accepts the in-memory cooldown resetting on restart for v1.
+The supplied Galaxy Neegy logo is bundled locally. Production IDs/credentials, contact
+link, registry release/digest, HTTPS/proxy inventory and encrypted off-host backup setup
+remain Task 9 inputs. No VPS access or deployment occurred during Task 8.

@@ -76,9 +76,30 @@ required-input, access and queue policies in force. Stop with the Task 7 PR unme
 Production credentials, live OAuth/registrations, DNS, VPS and deployment remain later
 phases; integrated lifecycle activation remains Task 8. See [dashboard contracts](dashboard.md).
 
+## Task 8 execution authorization and retention clarification — 14 November 2026
+
+The user authorized merging PR #7 after verifying latest head `c5f98cc`, passing native
+checks and no review blockers. It squash-merged as `c73789d5`. Task 8 is authorized in
+Cloud on `feat/task-8-runtime`, with isolated PostgreSQL, mocked external services and
+actual production-image execution on native AMD64 and ARM64 CI. Earlier phase stop
+points are historical. Keep the Task 3 allowance amendment and Tasks 4–7 policies intact.
+Stop with the Task 8 PR unmerged. No production credentials, registry release, live
+registration, paid calls, DNS changes, VPS access or deployment.
+
+Confirmed removal deletes credentials/configuration and related live records while
+preserving separate approval. Minimal accounting and request metadata follow retention
+independently: ordinary usage/audit 90 days, errors 7 days, completed receipts and known
+aggregated reservations 7 days; unresolved usage, its daily buckets and uncertain receipts
+remain until reconciliation to avoid allowance resets or replay. Maintenance runs at
+startup and daily; periods are cleanup thresholds, not instantaneous erasure guarantees.
+The existing Task 7 session lifetime is 12 hours, superseding A7's historical 7-day
+proposal. OAuth state is 10 minutes. No backups are enabled yet; Task 9 must establish
+maximum 7-day encrypted backup retention and test restoration before enabling AI.
+See [privacy](privacy.md), [operations](runbook.md) and [Task 9 checklist](task-9-checklist.md).
+
 ## Read this first
 
-The user approved the consolidated design in chat. Tasks 1–6 are merged; Task 7 development is on its feature branch. Original setup notes and progress checkboxes below are historical; the execution authorizations above define the current scope. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
+The user approved the consolidated design in chat. Tasks 1–7 are merged; Task 8 development is on its feature branch. Original setup notes and progress checkboxes below are historical; the execution authorizations above define the current scope. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
 
 Work locally in the user's Debian Termux checkout at `~/jackass-bot`, not `~/roblox-dev`. Inspect git status and local instructions before changes; preserve existing work. The remote README was checked on 13 November and contains only `# jackass-bot` and `bot for aa`; recheck the actual checkout before scaffolding.
 

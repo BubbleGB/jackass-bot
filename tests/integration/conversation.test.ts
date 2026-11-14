@@ -26,7 +26,7 @@ let db: Database,configs: PostgresConversationConfigRepository;
 describe('isolated direct context to transactional providers',() => {
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); configs = new PostgresConversationConfigRepository(db); });
   beforeEach(async () => {
-    await db.pool.query('TRUNCATE guild_settings,approved_guilds CASCADE');
+    await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds CASCADE');
     await db.pool.query('INSERT INTO guild_settings(guild_id,enabled,direct_enabled) VALUES($1,true,true)',[guild]);
     await db.pool.query('INSERT INTO approved_guilds(guild_id,approved_by) VALUES($1,$1)',[guild]);
     const e = cipher.seal(guild,'openai','fake-key');

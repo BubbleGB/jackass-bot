@@ -47,5 +47,5 @@ export function createDiscordApplication(o: Options) {
   };
   const worker: AutomaticService = new AutomaticService({ repository: new AutomaticRepository(o.database),config,history,context,direct,provider: router,queue,worker: guard,now,onOutcome: (r,result) => handlers.handleOutcome(r,result),onBegin: r => handlers.beginTyping(r),onEnd: r => handlers.endTyping(r) });
   const handlers: DiscordHandlers = new DiscordHandlers({ transport: o.transport,worker,access,status: settings,publicOrigin: o.publicOrigin,canDeliver,now,...(o.onDelivery ? { onDelivery: o.onDelivery } : {}),delivery: new DiscordDelivery(o.transport,canDeliver,{ signal: guard.signal,...(o.delay ? { delay: o.delay } : {}) }) });
-  return { handlers,worker,queue,start: () => worker.start(),async stop() { await worker.stop(); handlers.stop(); } };
+  return { handlers,worker,queue,guard,access,settings,start: () => worker.start(),async stop() { await worker.stop(); handlers.stop(); } };
 }

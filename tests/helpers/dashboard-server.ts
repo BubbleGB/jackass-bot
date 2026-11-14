@@ -10,13 +10,13 @@ const url = localTestDatabaseUrl(process.env.TEST_DATABASE_URL),name = `galaxy_b
 await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; const db = createDatabase(url.toString());
 await migrate(db.db,{ migrationsFolder: './drizzle' });
 const f = await webFixture(db); await f.app.register(import('@fastify/static'),{ root: `${process.cwd()}/dist/dashboard`,index: false });
-for (const path of ['/','/servers','/servers/:guildId','/creator']) f.app.get(path,(_r,reply) => reply.sendFile('index.html'));
+for (const path of ['/','/privacy','/servers','/servers/:guildId','/creator']) f.app.get(path,(_r,reply) => reply.sendFile('index.html'));
 f.app.get('/mock/discord',async (r,reply) => {
   const state = encodeURIComponent((r.query as { state: string }).state);
   return reply.type('text/html').send(`<form action="/auth/discord/callback"><input name="iss" type="hidden" value="https://discord.com"><input name="state" type="hidden" value="${state}"><button name="code" value="owner">Continue as owner</button><button name="code" value="delegate">Continue as delegate</button></form>`);
 });
 f.app.post('/mock/reset',async () => {
-  f.restoreMembership(); await db.pool.query('TRUNCATE guild_settings,approved_guilds,web_sessions,oauth_states CASCADE');
+  f.restoreMembership(); await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds,web_sessions,oauth_states CASCADE');
   await db.pool.query('INSERT INTO guild_settings(guild_id) VALUES($1)',[guildId]); await f.settings.setApproval(owner,guildId,true);
   await f.settings.grantAccess(owner,guildId,{ subjectType: 'role',subjectId: role },1,true);
   await f.settings.setCredential(owner,guildId,'openai','fake-provider-secret');
