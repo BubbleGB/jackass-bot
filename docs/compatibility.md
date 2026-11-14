@@ -239,3 +239,27 @@ authorized test-guild smoke test in [discord.md](discord.md). The existing CI ma
 these tests on native AMD64 and ARM64; current PR results establish remote success only
 once those checks have completed on its latest commit. No live Discord registration/login
 or paid provider call is part of this verification.
+
+## Task 7 web compatibility — checked 14 November 2026
+
+Exact official npm registry metadata was checked before installation:
+Fastify **5.12.8**, @fastify/cookie **11.1.5**, @fastify/static **10.1.11**,
+@fastify/rate-limit **11.2.2**, React/react-dom **19.3.1**, Vite **8.3.8**,
+and @types/react/@types/react-dom **19.3.0**. Pins and all transitive integrity hashes
+are committed in package-lock.json. The plugin compatibility tables support Fastify 5;
+Vite accepts Node ^20.19 or >=22.12, including unchanged pinned Node 26.13.1/npm 11.20.0.
+Existing Playwright **1.65.0** installs its matching Chromium **158.0.8127.18** (revision
+1254) for browser tests. The browser is a test dependency, not bundled into runtime.
+
+Official [Discord OAuth2 source](https://github.com/discord/discord-api-docs/blob/main/developers/topics/oauth2.mdx)
+was read for identify scope, confidential authorization-code exchange, form-encoded token
+endpoint, browser-bound state recommendation, exact redirect and documented `iss` issuer
+parameter (`https://discord.com`). No live OAuth/identity endpoint was called. Official
+package READMEs were checked for Fastify cookie options, plugin compatibility and route
+rate limits. No member/presence intent or broad OAuth guild scope was added.
+
+[actions/upload-artifact v7.0.2](https://github.com/actions/upload-artifact/releases/tag/v7.0.2)
+was resolved through the official GitHub tag to
+`cf430e030ddbb5b0abf93d22962f4752f3646cd9`; CI retains dashboard screenshots/traces for
+14 days. Native AMD64/ARM64 CI results, not local x64 results or metadata alone, establish
+verification on those architectures. See the Task 7 PR for latest-commit evidence.

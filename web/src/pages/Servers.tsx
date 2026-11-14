@@ -1,0 +1,9 @@
+import { useEffect,useState } from 'react';
+import { api,explain } from '../api.js';
+interface Server { id: string; name: string; level: string }
+export function Servers() {
+  const [servers,setServers] = useState<Server[]>([]),[next,setNext] = useState<string | null>(null),[error,setError] = useState(''),[loading,setLoading] = useState(true);
+  async function load(after = '') { setLoading(true); try { const r = await api<{ servers: Server[]; next: string | null }>(`/api/servers${after ? `?after=${after}` : ''}`); setServers(s => after ? [...s,...r.servers] : r.servers); setNext(r.next); } catch (e) { setError(explain(e)); } finally { setLoading(false); } }
+  useEffect(() => { void load(); },[]);
+  return <section className="page"><p className="eyebrow">MISSION CONTROL</p><h1>Choose your galaxy.</h1><p className="lead">Your approved servers, with access checked right now.</p>{error && <p role="alert" className="error">{error}</p>}<div className="server-grid">{servers.map(s => <a className="server-card panel" href={`/servers/${s.id}`} key={s.id}><span className="server-icon" aria-hidden="true">{s.name.charAt(0)}</span><div><h2>{s.name}</h2><p>{s.level === 'delegate' ? 'Delegated access' : 'Full control'} <span aria-hidden="true">→</span></p><small>{s.id}</small></div></a>)}</div>{loading && <p role="status">Checking current Discord access…</p>}{!loading && !servers.length && <div className="panel"><h2>No approved servers available yet.</h2><p>Check that the bot is installed, your server is approved, and your current role has access. Owners contact the creator for approval.</p><a href="/#privacy">Approval and contact information</a></div>}{next && <button onClick={() => { void load(next); }}>Check more servers</button>}<aside className="tip">Access can change. A removed role or server membership takes effect on your next protected action.</aside></section>;
+}

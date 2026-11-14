@@ -66,9 +66,19 @@ No Task 7, production tokens, live registrations, paid calls, VPS access or depl
 See [Discord contracts and remaining live smoke tests](discord.md). Foundation startup
 remains validation-only until the integrated lifecycle phase.
 
+## Task 7 execution authorization — 14 November 2026
+
+The user authorized merging PR #6 after verifying latest head `72b9c5d`, green checks
+and no merge blockers. It squash-merged as `f0e33f0`. Task 7 is authorized in Cloud on
+`feat/task-7-dashboard`, using the supplied logo, mocked Discord/provider services and
+isolated PostgreSQL. Earlier Task 7 stop points are historical. Keep all accounting,
+required-input, access and queue policies in force. Stop with the Task 7 PR unmerged.
+Production credentials, live OAuth/registrations, DNS, VPS and deployment remain later
+phases; integrated lifecycle activation remains Task 8. See [dashboard contracts](dashboard.md).
+
 ## Read this first
 
-The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
+The user approved the consolidated design in chat. Tasks 1–6 are merged; Task 7 development is on its feature branch. Original setup notes and progress checkboxes below are historical; the execution authorizations above define the current scope. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
 
 Work locally in the user's Debian Termux checkout at `~/jackass-bot`, not `~/roblox-dev`. Inspect git status and local instructions before changes; preserve existing work. The remote README was checked on 13 November and contains only `# jackass-bot` and `bot for aa`; recheck the actual checkout before scaffolding.
 

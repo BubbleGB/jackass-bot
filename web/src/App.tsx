@@ -1,0 +1,13 @@
+import { useEffect,useState } from 'react';
+import { api,setCsrf,ApiError,type Session,type Site } from './api.js';
+import { Landing } from './pages/Landing.js';
+import { Servers } from './pages/Servers.js';
+import { Settings } from './pages/Settings.js';
+import { Creator } from './pages/Creator.js';
+export function App() {
+  const [session,setSession] = useState<Session | null | undefined>(undefined),[site,setSite] = useState<Site>(),[connectionError,setConnectionError] = useState('');
+  useEffect(() => { void api<Site>('/api/site').then(setSite).catch(() => setConnectionError('Site information is temporarily unavailable. Reload to try again.')); void api<Session>('/api/session').then(s => { setCsrf(s.csrf); setSession(s); }).catch(e => { setSession(null); if (!(e instanceof ApiError && e.status === 401)) setConnectionError('The dashboard is temporarily unavailable. Reload to try again.'); }); },[]);
+  const path = location.pathname,signIn = `/auth/discord?returnTo=${encodeURIComponent(/^\/servers(?:\/\d{17,20})?$/.test(path) ? path : '/servers')}`;
+  async function logout() { await api('/auth/logout','POST'); for (const key of Object.keys(sessionStorage)) if (key.startsWith('gn-draft:')) sessionStorage.removeItem(key); location.assign('/'); }
+  return <><a className="skip" href="#main">Skip to content</a><header className="header"><a className="brand" href="/" aria-label="Galaxy Neegy home"><span aria-hidden="true">✦</span> Galaxy <b>Neegy</b></a><nav aria-label="Main navigation">{session ? <><a href="/servers">My servers</a>{session.creator && <a href="/creator">Creator approvals</a>}<button className="quiet" onClick={() => { void logout(); }}>Sign out</button></> : path !== '/' && <a href="/">Home</a>}</nav></header><main id="main">{connectionError && <p role="alert" className="error">{connectionError}</p>}{path === '/' ? <Landing site={site} signIn={signIn} signedIn={!!session} /> : session === undefined ? <p className="loading" role="status">Connecting to your galaxy…</p> : !session ? <section className="auth panel"><p className="eyebrow">YOUR SERVER, YOUR ORBIT</p><h1>Welcome back.</h1><p>Sign in to check your current server access and continue to the dashboard.</p><a className="button primary" href={signIn}>Sign in with Discord</a></section> : path === '/servers' ? <Servers /> : path === '/creator' ? <Creator creator={session.creator} /> : /^\/servers\/\d{17,20}$/.test(path) ? <Settings guildId={path.split('/')[2]!} session={session} /> : <h1>Page not found</h1>}</main><footer className="footer">Galaxy Neegy <span>Small conversations. Cosmic personality.</span><a href="/#privacy">Privacy &amp; approval</a></footer></>;
+}

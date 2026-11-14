@@ -14,27 +14,37 @@
     "test": "vitest run --config vitest.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js",
     "discord:register:test": "node --env-file-if-exists=.env dist/discord/register-cli.js --guild",
-    "discord:register:production": "node --env-file-if-exists=.env dist/discord/register-cli.js --global --production"
+    "discord:register:production": "node --env-file-if-exists=.env dist/discord/register-cli.js --global --production",
+    "test:e2e:server": "tsc -p tsconfig.e2e.json && node .tools/e2e/tests/helpers/dashboard-server.js"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "@fastify/rate-limit": "11.2.2",
+    "@fastify/static": "10.1.11",
     "discord.js": "14.28.1",
     "drizzle-orm": "0.45.4",
-    "pg": "8.23.1"
+    "fastify": "5.12.8",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.65.0",
     "@types/node": "26.6.6",
     "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "drizzle-kit": "0.31.11",
     "eslint": "10.14.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
+    "vite": "8.3.8",
     "vitest": "5.1.0"
   },
   "overrides": {

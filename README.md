@@ -4,8 +4,8 @@ bot for aa
 
 ## Galaxy Neegy — settings and access foundation
 
-A TypeScript foundation recovered from the phone and extended through Task 6 of the approved [handoff](docs/galaxy-neegy-handoff.md).
-The current program validates configuration and exits. Integrated runtime startup, HTTP routes and the dashboard remain later tasks.
+A TypeScript foundation recovered from the phone and extended through Task 7 of the approved [handoff](docs/galaxy-neegy-handoff.md).
+The current program validates configuration and exits. HTTP/dashboard factories are available; integrated runtime activation remains Task 8.
 Task 2 adds backend access/settings/credential services. Task 3 adds provider adapters and
 atomic usage accounting; see [provider/accounting contracts and limitations](docs/providers-usage.md).
 Task 4 adds bounded channel context and direct eligibility/cooldowns; see
@@ -14,7 +14,9 @@ Task 5 adds durable activity/snapshot accounting and a bounded single-worker que
 [automatic scheduling contracts](docs/automatic.md).
 Task 6 adds Discord gateway/command adapters and safe output delivery; see
 [Discord composition, acknowledgements and explicit registration](docs/discord.md).
-The adapters are tested with mocks and are not activated by foundation startup.
+Task 7 adds Discord sign-in, protected HTTP routes and the mobile dashboard; see
+[dashboard setup, security, drafts and live-check limits](docs/dashboard.md).
+The services are tested with mocks and are not activated by foundation startup.
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
 The Oracle ARM64 VPS remains an eventual deployment target; it is not a test database.
@@ -85,21 +87,24 @@ fields. Copy it to a local `.env` only if needed; real `.env` files are ignored.
 Runtime mode requires a PostgreSQL URL, HTTPS public origin in production, a canonical
 base64 32-byte encryption key, Discord bot/OAuth credentials and creator snowflake.
 Config errors contain field names, never supplied values. Task 2 provides authenticated provider-key storage through the service layer;
-no web key-entry endpoint or active live worker exists yet.
+Task 7 exposes authenticated write-only key endpoints; no live worker is activated.
 
 The read-only [checks workflow](.github/workflows/checks.yml) installs from the lockfile,
 runs lint/typecheck/unit/build/database checks, checks migration drift and smoke-tests
 foundation startup on native AMD64 and ARM64 Linux runners. It uses a fresh PostgreSQL
 service and no deployment secrets. Task 1 passed both architectures before PR #1 was squash-merged.
-Task 2 also passed both architectures; current Task 3 CI results are recorded in its PR; local checks alone never establish remote success.
+Tasks 1–6 passed both architectures before merging. See the current PR for the latest
+dashboard/browser results; local checks alone never establish remote success.
 
-`npm run test:e2e` is reserved for Task 7. No browser scenarios exist yet, so it is not
-part of Task 1 CI and must not be reported as passing. No image publication or deployment
+`npm run test:e2e` runs Chromium mobile (390px) and desktop scenarios against real HTTP/
+access/settings services with fake Discord and isolated PostgreSQL. Run `npx playwright
+install chromium` once in Cloud; CI installs its browser on both architectures. Screenshots
+and failure traces are retained as workflow artifacts. No image publication or deployment
 workflow is present.
 
 Pending later inputs include application/creator/guild IDs, credentials through secret
-storage, contact link, the original mascot logo, registry access and an encrypted off-VPS
-backup destination. None is needed to run Task 1 checks. Task 6 is the current boundary; its PR stays unmerged. Live Discord login/registration,
+storage, contact link, registry access and an encrypted off-VPS
+backup destination. None is needed to run mocked checks. The supplied logo is now bundled locally. Task 7 is the current boundary; its PR stays unmerged. Live Discord login/registration,
 production credentials, VPS access and deployment require further instruction. Current direct text is separate from
 history caps and never silently truncated; oversized required input gets a typed rejection.
 The user accepts the in-memory cooldown resetting on restart for v1.

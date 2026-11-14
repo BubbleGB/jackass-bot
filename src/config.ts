@@ -3,6 +3,7 @@ export interface AppConfig {
   mode: 'foundation' | 'runtime';
   port: number;
   publicOrigin: string;
+  contactUrl: string | undefined;
   databaseUrl: string | undefined;
   encryptionKey: Buffer | undefined;
   encryptionKeyVersion: number;
@@ -10,6 +11,10 @@ export interface AppConfig {
   discordClientId: string | undefined;
   discordClientSecret: string | undefined;
   creatorUserId: string | undefined;
+}
+
+export function validContactUrl(value: string): boolean {
+  try { const u = new URL(value); return !/\s/.test(value) && !u.username && !u.password && (u.protocol === 'https:' || (u.protocol === 'mailto:' && /^[^/?#@]+@[^/?#@]+$/.test(u.pathname))); } catch { return false; }
 }
 
 /** Errors contain field names only: never serialize environment values or URL errors. */
@@ -33,6 +38,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     const url = new URL(publicOrigin);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/' || (nodeEnv === 'production' && url.protocol !== 'https:')) invalid.add('PUBLIC_ORIGIN');
   } catch { invalid.add('PUBLIC_ORIGIN'); }
+  const contactUrl = env.CONTACT_URL;
+  if (contactUrl !== undefined && !validContactUrl(contactUrl)) invalid.add('CONTACT_URL');
   const databaseUrl = env.DATABASE_URL;
   if (databaseUrl !== undefined) {
     try {
@@ -56,7 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   if (invalid.size) throw new Error(`Invalid configuration fields: ${[...invalid].sort().join(', ')}`);
   return {
     nodeEnv: nodeEnv as AppConfig['nodeEnv'], mode: mode as AppConfig['mode'], port,
-    publicOrigin: new URL(publicOrigin).origin, databaseUrl, encryptionKey, encryptionKeyVersion,
+    publicOrigin: new URL(publicOrigin).origin, contactUrl, databaseUrl, encryptionKey, encryptionKeyVersion,
     discordBotToken: env.DISCORD_BOT_TOKEN, discordClientId: env.DISCORD_CLIENT_ID,
     discordClientSecret: env.DISCORD_CLIENT_SECRET, creatorUserId: env.CREATOR_USER_ID,
   };
