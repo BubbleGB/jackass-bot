@@ -41,7 +41,9 @@ also exercises the archive save/record/load round-trip on both native architectu
 
 The final tag is `sha-<full-source-SHA>`. Architecture staging tags include the workflow
 run/attempt/architecture; the final index is assembled from their verified digests,
-not mutable staging-tag lookups. Workflows are serialized and refuse an existing
+not mutable staging-tag lookups. Explicit `docker push --platform linux/<architecture>`
+ensures each staging reference is a single-platform image, including with Docker's
+containerd image store; the runner needs Docker API 1.46+ for that flag. Workflows are serialized and refuse an existing
 commit tag. GHCR itself does not make tags immutable against other authorised writers;
 operators must deploy by the **verified manifest digest**, never by `latest` or a tag.
 This first procedure publishes an ordinary two-platform index without separate build

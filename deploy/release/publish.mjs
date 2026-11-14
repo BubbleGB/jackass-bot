@@ -14,7 +14,7 @@ export async function publishTested({ source,runId,attempt,archives,registry,run
   for (const architecture of ['amd64','arm64']) {
     const part = `build-${runId}-${attempt}-${architecture}`,target = IMAGE+':'+part;
     if (await registry.manifest(part)) throw new Error('release_tag_exists');
-    run(['tag','galaxy-release:'+architecture,target]); run(['push',target]);
+    run(['tag','galaxy-release:'+architecture,target]); run(['push','--platform','linux/'+architecture,target]);
     const pushed = await registry.manifest(part);
     if (pushed?.body.config?.digest !== archives[architecture].proof.imageId) throw new Error('pushed_image_mismatch');
     digests.push(IMAGE+'@'+pushed.digest);

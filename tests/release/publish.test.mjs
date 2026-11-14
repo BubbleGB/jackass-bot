@@ -11,7 +11,7 @@ async function setup(run) {
     const commands = [],archives = {};
     for (const architecture of ['amd64','arm64']) { const file = dir+'/'+architecture; await writeFile(file,architecture); archives[architecture] = { file,proof: { source,architecture,imageId: id(architecture),archiveSha256: await archiveHash(file) } }; }
     const options = { source,runId: '123',attempt: '1',archives,
-      registry: { async manifest(ref) { return !commands.some(c => c[0] === 'push' && c[1].endsWith(':'+ref)) ? null : { digest: 'sha256:'+(ref.endsWith('amd64') ? 'd' : 'e').repeat(64),body: { config: { digest: id(ref.endsWith('amd64') ? 'amd64' : 'arm64') } } }; } },
+      registry: { async manifest(ref) { return !commands.some(c => c[0] === 'push' && c.at(-1).endsWith(':'+ref)) ? null : { digest: 'sha256:'+(ref.endsWith('amd64') ? 'd' : 'e').repeat(64),body: { config: { digest: id(ref.endsWith('amd64') ? 'amd64' : 'arm64') } } }; } },
       run(args) { commands.push(args); if (args[0] === 'image') { const architecture = args[2].split(':').at(-1); return JSON.stringify([{ Id: id(architecture),Os: 'linux',Architecture: architecture,Config: { Labels: { 'org.opencontainers.image.revision': source,'org.opencontainers.image.source': 'https://github.com/BubbleGB/jackass-bot' } } }]); } return ''; },
     }; await run(options,commands);
   } finally { await rm(dir,{ recursive: true,force: true }); }
@@ -19,6 +19,7 @@ async function setup(run) {
 test('publishes only the archived tested identities and creates the index from digests',async () => setup(async (o,commands) => {
   const result = await publishTested(o); assert.equal(result,'sha-'+source);
   assert.equal(commands.filter(c => c[0] === 'build').length,0); assert.equal(commands.filter(c => c[0] === 'push').length,2);
+  assert.deepEqual(commands.filter(c => c[0] === 'push').map(c => c.slice(1,3)),[['--platform','linux/amd64'],['--platform','linux/arm64']]);
   const index = commands.find(c => c[0] === 'buildx'); assert(index); assert.equal(index.filter(v => v.startsWith('ghcr.io/bubblegb/galaxy-neegy@sha256:')).length,2);
 }));
 test('never overwrites an existing commit tag',async () => setup(async (o,commands) => {
