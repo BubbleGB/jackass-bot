@@ -181,6 +181,11 @@ temporary Discord verification failures are 503, while confirmed access denials 
 cookies, environment variables, response bodies or raw Discord errors.
 Container/proxy retention and encrypted backups must be configured separately in Task 9.
 
+For repeated settings-page failures, see [dashboard REST reliability](dashboard-reliability.md).
+Collect only the existing route/status/timingMs/category diagnostic records. The fix
+requires no new secrets, database migration or Compose setting. Permission lookups are
+shared only while pending; a later operation verifies current membership again.
+
 ## Reproduce image verification without external credentials
 
 ```sh

@@ -21,6 +21,7 @@ const record = (value: unknown): Record<string, unknown> => {
 };
 const snowflake = (value: unknown): value is string => typeof value === 'string' && /^\d{17,20}$/.test(value);
 export class DiscordMembership implements MembershipRepository {
+  private readonly inFlight = new Map<string,Promise<MembershipSnapshot | null>>();
   constructor(private readonly get: DiscordGet, private readonly botId: string) {}
   private async request(path: string, signal?: AbortSignal): Promise<unknown> {
     const controller = new AbortController();
@@ -37,19 +38,24 @@ export class DiscordMembership implements MembershipRepository {
       return await Promise.race([this.get(path,controller.signal), timeout]);
     } finally { clearTimeout(timer); signal?.removeEventListener('abort',abort); }
   }
-  async lookup(userId: string, guildId: string): Promise<MembershipSnapshot | null> {
+  lookup(userId: string,guildId: string): Promise<MembershipSnapshot | null> {
+    if (![userId,guildId,this.botId].every(snowflake)) return Promise.resolve(null);
+    const key = `${guildId}:${userId}`,pending = this.inFlight.get(key); if (pending) return pending;
+    const work = this.freshLookup(userId,guildId).finally(() => { this.inFlight.delete(key); }); this.inFlight.set(key,work); return work;
+  }
+  private async freshLookup(userId: string, guildId: string): Promise<MembershipSnapshot | null> {
     if (![userId, guildId, this.botId].every(snowflake)) return null;
-    let values: unknown[];
+    let values: unknown[]; const controller = new AbortController();
     try {
       values = await Promise.all([
-        this.request(`/guilds/${guildId}`), this.request(`/guilds/${guildId}/members/${userId}`),
-        this.request(`/guilds/${guildId}/members/${this.botId}`), this.request(`/guilds/${guildId}/roles`),
+        this.request(`/guilds/${guildId}`,controller.signal), this.request(`/guilds/${guildId}/members/${userId}`,controller.signal),
+        this.request(`/guilds/${guildId}/members/${this.botId}`,controller.signal), this.request(`/guilds/${guildId}/roles`,controller.signal),
       ]);
     } catch (e) {
       if (e instanceof DiscordFailure && e.kind === 'forbidden') return null;
       if (e instanceof MembershipVerificationError) throw e;
       throw new MembershipVerificationError(e instanceof DiscordFailure && e.kind === 'rate_limited' ? 'rate_limited' : 'unavailable');
-    }
+    } finally { controller.abort(); }
     try {
       const [g,m,b,r] = values;
       const guild = record(g), member = record(m), bot = record(b);

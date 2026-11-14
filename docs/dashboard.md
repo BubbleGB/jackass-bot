@@ -1,5 +1,8 @@
 # Website and dashboard — Task 7
 
+Current request sharing, bounded GET scheduling and independently retryable panels are
+described in [the dashboard reliability investigation](dashboard-reliability.md).
+
 Task 7 adds lazy Fastify HTTP/auth factories and a built React dashboard. Foundation
 startup still validates and exits. Integrated production startup, proxy/DNS configuration,
 operational cleanup and deployment remain Tasks 8–9, under separate authorization.

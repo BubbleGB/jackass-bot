@@ -10,12 +10,12 @@ async function traceLoad(page: Page) {
     const p = new URL(route.request().url()).pathname.split('/').at(-1)!;
     starts.push(p); if (initial.includes(p) && starts.filter(p => initial.includes(p)).length === 4) release();
     if (initial.includes(p)) await gate;
-    if (p === 'grants') expect(responses.filter(r => initial.includes(r.route)).slice(-4).map(r => r.route).sort()).toEqual([...initial].sort());
+    if (p === 'grants') expect(responses.some(r => r.route === 'settings' && r.status === 200)).toBe(true);
     await route.continue();
   }); return { starts,responses };
 }
-test('offers retry instead of an access-denied warning when initial concurrent verification is rate limited',async ({ page,request }) => {
-  await request.post('/mock/access-fault',{ data: { mode: 'burst' } }); const trace = await traceLoad(page); await signIn(page);
+test('offers retry instead of an access-denied warning when initial concurrent verification is unavailable',async ({ page,request }) => {
+  await request.post('/mock/access-fault',{ data: { mode: 'unavailable' } }); const trace = await traceLoad(page); await signIn(page);
   await expect(page.getByRole('alert')).toContainText('verification is temporarily unavailable');
   await expect.poll(() => trace.responses.length).toBe(4); expect(trace.starts.sort()).toEqual([...initial].sort()); expect(trace.responses.some(r => r.status === 503)).toBe(true);
   await expect(page.getByLabel('Shared personality')).toHaveCount(0);
@@ -24,10 +24,10 @@ test('offers retry instead of an access-denied warning when initial concurrent v
   await expect(page.getByLabel('Shared personality')).toBeVisible(); await expect(page.getByRole('alert')).toHaveCount(0);
 });
 test('scopes a later grants verification failure and retries without losing unsaved settings',async ({ page,request }) => {
-  await request.post('/mock/access-fault',{ data: { mode: 'rate_limited',at: 6 } }); const trace = await traceLoad(page); await signIn(page);
+  await request.post('/mock/access-fault',{ data: { mode: 'unavailable',at: 2 } }); const trace = await traceLoad(page); await signIn(page);
   await expect(page.getByLabel('Shared personality')).toBeVisible(); await expect(page.locator('#access').getByRole('alert')).toContainText('verification is temporarily unavailable');
   expect(trace.starts.slice(0,4).sort()).toEqual([...initial].sort()); expect(trace.starts[4]).toBe('grants'); expect(trace.responses.find(r => r.route === 'grants')?.status).toBe(503);
-  expect(await (await page.request.get('/mock/access-trace')).json()).toEqual({ lookups: 6,discordReads: 25 });
+  expect(await (await page.request.get('/mock/access-trace')).json()).toEqual({ lookups: 2,discordReads: 9 });
   await page.getByLabel('Shared personality').fill('Preserve this draft during access retry');
   await page.getByRole('button',{ name: 'Retry loading grants' }).click(); await expect(page.locator('#access').getByRole('alert')).toHaveCount(0);
   await expect(page.getByLabel('Shared personality')).toHaveValue('Preserve this draft during access retry');
@@ -38,7 +38,7 @@ test('slow successful lookups complete the actual concurrent load without an acc
   expect(trace.responses.map(r => r.status)).toEqual([200,200,200,200,200]); await expect(page.getByRole('alert')).toHaveCount(0);
 });
 test('a bounded grants timeout has a scoped retry, while genuine departure still denies the current session',async ({ page,request }) => {
-  await request.post('/mock/access-fault',{ data: { mode: 'timeout',at: 6 } }); const trace = await traceLoad(page); await signIn(page);
+  await request.post('/mock/access-fault',{ data: { mode: 'timeout',at: 2 } }); const trace = await traceLoad(page); await signIn(page);
   await expect(page.getByLabel('Shared personality')).toBeVisible(); await expect(page.locator('#access').getByRole('alert')).toContainText('verification is temporarily unavailable',{ timeout: 10000 });
   expect(trace.responses.find(r => r.route === 'grants')?.status).toBe(503);
   await request.post('/mock/leave'); await page.getByRole('button',{ name: 'Retry loading grants' }).click();

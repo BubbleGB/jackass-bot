@@ -10,6 +10,41 @@ const responses: Record<string, unknown> = {
   [`/channels/${channel}`]: { id: channel, guild_id: guild, type: 0 },
 };
 describe('fresh documented Discord REST membership', () => {
+  it('isolates pending lookups by both actor and guild',async () => {
+    let release!: () => void,reads = 0; const gate = new Promise<void>(r => { release = r; });
+    const adapter = new DiscordMembership(async path => {
+      reads++; await gate; const parts = path.split('/');
+      if (parts.length === 3) return { id: parts[2],owner_id: user };
+      if (parts[3] === 'members') return { user: { id: parts[4] },roles: [] };
+      return [];
+    },bot);
+    const work = [adapter.lookup(user,guild),adapter.lookup(role,guild),adapter.lookup(user,role)]; release();
+    expect((await Promise.all(work)).map(x => [x?.userId,x?.guildId])).toEqual([[user,guild],[role,guild],[user,role]]); expect(reads).toBe(12);
+  });
+  it('times out a queued lookup, cancels its work and verifies afresh after the bucket recovers',async () => {
+    vi.useFakeTimers();
+    try {
+      let reads = 0;
+      const rest = new DiscordRest('synthetic',async url => {
+        reads++; const path = new URL(String(url)).pathname.replace('/api/v10','');
+        return new Response(JSON.stringify(responses[path]),{ headers: path.endsWith('/roles') ? { 'x-ratelimit-remaining': '0','x-ratelimit-reset-after': '6' } : {} });
+      });
+      const adapter = new DiscordMembership((path,signal) => rest.call({ method: 'GET',path,signal }),bot);
+      expect(await adapter.lookup(user,guild)).not.toBeNull();
+      const work = adapter.lookup(user,guild),assertion = expect(work).rejects.toMatchObject({ reason: 'timeout' });
+      await vi.advanceTimersByTimeAsync(5000); await assertion; expect(reads).toBe(7);
+      await vi.advanceTimersByTimeAsync(1100); expect(reads).toBe(7);
+      expect(await adapter.lookup(user,guild)).not.toBeNull(); expect(reads).toBe(11);
+    } finally { vi.useRealTimers(); }
+  });
+  it('shares only identical in-flight membership, then verifies departure afresh',async () => {
+    let release!: () => void,reads = 0,departed = false;
+    const gate = new Promise<void>(r => { release = r; });
+    const adapter = new DiscordMembership(async path => { reads++; await gate; if (departed && path.endsWith(user)) return { user: { id: bot },roles: [] }; return responses[path]; },bot);
+    const pending = [adapter.lookup(user,guild),adapter.lookup(user,guild),adapter.lookup(user,guild)]; release();
+    expect((await Promise.all(pending)).every(Boolean)).toBe(true); expect(reads).toBe(4);
+    departed = true; expect(await adapter.lookup(user,guild)).toBeNull(); expect(reads).toBe(8);
+  });
   it.each(['guild','actor','bot'].flatMap(part => [undefined,null,'bad-id'].map(id => ({ part,id }))))('rejects malformed $part identity $id as unavailable, never as membership denial',async ({ part,id }) => {
     const adapter = new DiscordMembership(async path => {
       if (part === 'guild' && path === `/guilds/${guild}`) return { id,owner_id: user };

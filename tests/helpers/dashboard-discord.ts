@@ -1,16 +1,24 @@
 import { DiscordRest } from '../../src/discord/transport.js';
-export type LookupFault = 'none' | 'slow' | 'burst' | 'rate_limited' | 'timeout' | 'unavailable';
+export type LookupFault = 'none' | 'slow' | 'burst' | 'rate_limited' | 'timeout' | 'unavailable' | 'bucket';
 /** Only network boundary is mocked; production REST classification and membership are real. */
 export function dashboardDiscord(ids: { guild: string; owner: string; delegate: string; role: string; channel: string; other: string }) {
   const bot = '777777777777777777'; let member = true,hasRole = true,botPresent = true;
-  let mode: LookupFault = 'none',at = 1,lookups = 0,reads = 0,activeRoles = 0;
+  let mode: LookupFault = 'none',at = 1,lookups = 0,reads = 0,activeRoles = 0,resetAt = 0;
   const rest = new DiscordRest('synthetic-discord-token',async (url,init) => {
     const path = new URL(String(url)).pathname.replace('/api/v10',''); reads++;
+    if (mode === 'bucket') await new Promise(r => setTimeout(r,20));
     const json = (b: unknown,status = 200) => new Response(JSON.stringify(b),{ status });
     if (path === `/guilds/${ids.guild}`) return json({ id: ids.guild,owner_id: ids.owner,name: 'Bubble Galaxy' });
     if (path === `/guilds/${ids.guild}/roles`) {
       lookups++; const n = lookups; activeRoles++;
+      if (!['none','bucket','burst'].includes(mode)) await new Promise(r => setTimeout(r,40));
       try {
+        if (mode === 'bucket') {
+          const remaining = resetAt-Date.now();
+          if (remaining > 0) return new Response(JSON.stringify({ retry_after: remaining/1000 }),{ status: 429,headers: { 'x-ratelimit-bucket': 'mock-guild-roles','x-ratelimit-remaining': '0','x-ratelimit-reset-after': String(remaining/1000) } });
+          resetAt = Date.now()+80;
+          return new Response(JSON.stringify([{ id: ids.guild,permissions: '0' },{ id: ids.role,permissions: '0' }]),{ headers: { 'x-ratelimit-bucket': 'mock-guild-roles','x-ratelimit-remaining': '0','x-ratelimit-reset-after': '0.08' } });
+        }
         if ((mode === 'burst' && activeRoles > 1) || (mode === 'rate_limited' && n === at)) return json({ retry_after: 1 },429);
         if (mode === 'timeout' && n === at) return await new Promise<Response>((_resolve,reject) => { const abort = () => reject(new Error('synthetic-abort')); if (init?.signal?.aborted) abort(); else init?.signal?.addEventListener('abort',abort,{ once: true }); });
         if (mode === 'unavailable' && n === at) return json({},502);
