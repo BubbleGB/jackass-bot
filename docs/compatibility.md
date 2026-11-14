@@ -187,3 +187,23 @@ These are local usage safeguards, not hard billing caps or monetary estimates.
 No live model availability, credential validity, billing, safety response distribution or
 retention was tested. Provider policy may retain data even when API state storage is off.
 See [reservation evidence and short-request examples](google-reservation-investigation.md).
+
+## Task 4 Discord REST contracts — checked 14 November 2026
+
+No SDK/dependency was introduced; native bot-authenticated GET is still injected.
+Official Discord documentation source was read:
+
+- [Messages](https://github.com/discord/discord-api-docs/blob/main/developers/resources/message.mdx):
+  channel history GET limit 1–100 and before cursor, channel-scoped single message,
+  author.bot, webhook_id, mentions and same-channel message_reference/referenced_message.
+  Embedded reply references can be absent/null; unresolved author identity fails closed.
+- [Channels](https://github.com/discord/discord-api-docs/blob/main/developers/resources/channel.mdx):
+  only type 0 GUILD_TEXT qualifies; DM, announcement, forum and thread types are excluded.
+- [Permissions](https://github.com/discord/discord-api-docs/blob/main/developers/topics/permissions.mdx):
+  owner/Administrator bypass, everyone → aggregate role → member overwrite order,
+  View Channel (1<<10), Send Messages (1<<11), Read Message History (1<<16), timeout rules.
+
+Fixtures exercise these fields/overwrites and lost permissions without a Discord network
+client or token. Context uses Task 3's complete request counters and accounting policy;
+no new “exact” billing claim, model alias or runtime package change is introduced.
+See [context/direct contracts](context-direct.md) for wiring, operational limits and tests.

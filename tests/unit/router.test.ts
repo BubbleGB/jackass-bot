@@ -11,7 +11,7 @@ const input: GenerationInput = { instructions: 'untrusted caller instruction',co
 const result: GenerationResult = { kind: 'answer',text: 'Hello',usage: { inputTokens: 10,outputTokens: 10,reasoningTokens: 5,totalTokens: 20,certainty: 'reported' } };
 const candidate = (provider: ProviderId): Candidate => ({ provider,modelId: provider === 'openai' ? 'gpt-5.4-mini-2026-03-17' : 'gemini-3.5-flash-lite',effort: 'low',revision: 1,configurationKey: 'a'.repeat(64),ciphertext: Buffer.alloc(32),nonce: Buffer.alloc(12),keyVersion: 1,blocked: false,retryAt: 0,failures: 0 });
 function fixture() {
-  const config: RoutingConfig = { revision: 1,instructions: 'saved personality',maxGenerationTokens: 2048,autoPolicy: 'conditional',candidates: [candidate('openai'),candidate('google')] };
+  const config: RoutingConfig = { revision: 1,instructions: 'saved personality',contextTokenLimit: 8000,maxGenerationTokens: 2048,autoPolicy: 'conditional',candidates: [candidate('openai'),candidate('google')] };
   const claims = new Set<string>(),failures: string[] = [],settlements: string[] = [],calls: ProviderId[] = [];
   let current = true;
   const repository: ProviderRepository = {
@@ -22,7 +22,7 @@ function fixture() {
     async reserveUsage(guildId: string,provider: ProviderId,attemptId: string,estimate: number,now: Date): Promise<Reservation | null> { return { id: provider,guildId,provider,attemptId,amount: estimate,utcDate: now.toISOString().slice(0,10),state: 'reserved' }; },
     async settleUsage(id: string,_usage: unknown,state: string) { settlements.push(`${id}:${state}`); },
   };
-  const adapters = new Map<ProviderId,ProviderAdapter>(['openai','google'].map(provider => [provider as ProviderId,{ provider: provider as ProviderId,async estimateUsage() { return 50; },async generate(i: GenerationInput) { calls.push(provider as ProviderId); expect(i.instructions).toBe('saved personality'); expect(i.maxGenerationTokens).toBe(2048); return result; } }]));
+  const adapters = new Map<ProviderId,ProviderAdapter>(['openai','google'].map(provider => [provider as ProviderId,{ provider: provider as ProviderId,async estimateUsage() { return 2058; },async generate(i: GenerationInput) { calls.push(provider as ProviderId); expect(i.instructions).toBe('saved personality'); expect(i.maxGenerationTokens).toBe(2048); return result; } }]));
   const router = () => new ProviderRouter(repository,usage,{ open() { return 'fake-key'; } },adapters);
   return { config,repository,usage,adapters,router,failures,settlements,calls,setCurrent(value: boolean) { current = value; } };
 }
@@ -70,6 +70,12 @@ describe('bounded provider orchestration', () => {
     f.usage.settleUsage = async () => { if (fails) { fails = false; throw new Error('database private detail'); } };
     await expect(f.router().generateWithFallback(request,input)).rejects.toThrow();
     expect(f.calls).toEqual(['openai']);
+  });
+  it('rejects a stale context/settings revision before any provider count or generation',async () => {
+    const f = fixture(); let counted = 0;
+    for (const a of f.adapters.values()) a.estimateUsage = async () => { counted++; return 50; };
+    await expect(f.router().generateWithFallback(request,input,2)).rejects.toThrow('configuration_changed');
+    expect(counted).toBe(0); expect(f.calls).toEqual([]);
   });
   it('bounds an uncooperative generation to 60 seconds and keeps its reservation', async () => {
     vi.useFakeTimers();

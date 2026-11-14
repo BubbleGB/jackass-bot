@@ -4,10 +4,12 @@ bot for aa
 
 ## Galaxy Neegy — settings and access foundation
 
-A TypeScript foundation recovered from the phone and extended through Task 3 of the approved [handoff](docs/galaxy-neegy-handoff.md).
+A TypeScript foundation recovered from the phone and extended through Task 4 of the approved [handoff](docs/galaxy-neegy-handoff.md).
 The current program validates configuration and exits. Discord startup, AI calls, HTTP routes and the dashboard are not implemented yet.
 Task 2 adds backend access/settings/credential services. Task 3 adds provider adapters and
 atomic usage accounting; see [provider/accounting contracts and limitations](docs/providers-usage.md).
+Task 4 adds bounded channel context and direct eligibility/cooldowns; see
+[context and direct-request contracts](docs/context-direct.md).
 These services are not yet wired to live Discord or HTTP routes.
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.

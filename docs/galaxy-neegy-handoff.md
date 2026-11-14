@@ -23,6 +23,14 @@ Development/testing moved to Codex Cloud at `/workspace/jackass-bot`; Termux set
 is historical. The Oracle VPS remains the eventual deployment target. PR #3 stays unmerged;
 no Task 4, paid calls, production keys, VPS access or deployment is authorized by this amendment.
 
+## Task 4 execution authorization — 14 November 2026
+
+The user authorized verifying and squash-merging PR #3, then implementing Task 4 in Cloud.
+PR #3 merged as `796719f` after its latest AMD64/ARM64 checks passed and reviews/threads
+showed no blockers. The accounting amendment above remains in force; its former PR #3 /
+Task 4 stop point is historical. Task 4 must stop with its new PR unmerged. Task 5, VPS
+access and deployment remain unauthorized. See [Task 4 contracts](context-direct.md).
+
 ## Read this first
 
 The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
