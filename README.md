@@ -3,8 +3,8 @@
 A Discord bot and mobile dashboard with per-server access control, encrypted write-only
 provider credentials, bounded channel context, direct/automatic requests and daily usage
 safeguards. Development and testing use Codex Cloud; the Oracle ARM64 VPS remains the
-future deployment target. Tasks 1–7 are merged. Task 8 adds the integrated runtime and
-production package; deployment and live acceptance require separate Task 9 authorisation.
+future deployment target. Tasks 1–8 are merged. Task 9 deployment preparation
+is repository-only; production deployment and publication require separate authorisation.
 
 `APP_MODE=foundation` validates configuration and exits without services. `APP_MODE=runtime`
 starts the Discord gateway, Fastify dashboard/API, database-backed single worker, health
@@ -63,7 +63,12 @@ npm run test:image -- galaxy-image:test
 
 The multi-stage image pins Node by digest and runs as non-root. `compose.yaml` keeps
 PostgreSQL private, mounts secret files, excludes app/database from Watchtower and makes
-migrations an explicit operator step. The image smoke test uses temporary test credentials,
+migrations an explicit operator step. For the prepared Galaxy hostname, use the explicit
+merge of `compose.yaml` and `compose.production.yaml` as project `galaxy-neegy`;
+the override removes inherited host ports and connects only the app to existing
+`aio_network`. Run `npm run test:compose` for a dummy-value networks/ports/labels report.
+Deployment and image publication still need separate authorisation. The image smoke
+test uses temporary test credentials,
 a separate Compose project and mounted external-service fixtures. It executes the actual
 compiled entry point, database, dashboard/logo, singleton guard, event-to-accounting/delivery,
 graceful shutdown and crash recovery. It never publishes an image or calls a paid API.
