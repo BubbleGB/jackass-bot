@@ -4,15 +4,17 @@ bot for aa
 
 ## Galaxy Neegy — settings and access foundation
 
-A TypeScript foundation recovered from the phone and extended through Task 5 of the approved [handoff](docs/galaxy-neegy-handoff.md).
-The current program validates configuration and exits. Discord startup, AI calls, HTTP routes and the dashboard are not implemented yet.
+A TypeScript foundation recovered from the phone and extended through Task 6 of the approved [handoff](docs/galaxy-neegy-handoff.md).
+The current program validates configuration and exits. Integrated runtime startup, HTTP routes and the dashboard remain later tasks.
 Task 2 adds backend access/settings/credential services. Task 3 adds provider adapters and
 atomic usage accounting; see [provider/accounting contracts and limitations](docs/providers-usage.md).
 Task 4 adds bounded channel context and direct eligibility/cooldowns; see
 [context and direct-request contracts](docs/context-direct.md).
 Task 5 adds durable activity/snapshot accounting and a bounded single-worker queue; see
 [automatic scheduling contracts](docs/automatic.md).
-These services are not yet wired to live Discord or HTTP routes.
+Task 6 adds Discord gateway/command adapters and safe output delivery; see
+[Discord composition, acknowledgements and explicit registration](docs/discord.md).
+The adapters are tested with mocks and are not activated by foundation startup.
 
 Development and testing now happen in **Codex Cloud** at `/workspace/jackass-bot`.
 The Oracle ARM64 VPS remains an eventual deployment target; it is not a test database.
@@ -83,7 +85,7 @@ fields. Copy it to a local `.env` only if needed; real `.env` files are ignored.
 Runtime mode requires a PostgreSQL URL, HTTPS public origin in production, a canonical
 base64 32-byte encryption key, Discord bot/OAuth credentials and creator snowflake.
 Config errors contain field names, never supplied values. Task 2 provides authenticated provider-key storage through the service layer;
-no web key-entry endpoint or live provider worker exists yet.
+no web key-entry endpoint or active live worker exists yet.
 
 The read-only [checks workflow](.github/workflows/checks.yml) installs from the lockfile,
 runs lint/typecheck/unit/build/database checks, checks migration drift and smoke-tests
@@ -97,7 +99,7 @@ workflow is present.
 
 Pending later inputs include application/creator/guild IDs, credentials through secret
 storage, contact link, the original mascot logo, registry access and an encrypted off-VPS
-backup destination. None is needed to run Task 1 checks. Task 5 is the current boundary; its PR remains unmerged. Live Discord wiring, VPS
-access and deployment require further instruction. Current direct text is separate from
+backup destination. None is needed to run Task 1 checks. Task 6 is the current boundary; its PR stays unmerged. Live Discord login/registration,
+production credentials, VPS access and deployment require further instruction. Current direct text is separate from
 history caps and never silently truncated; oversized required input gets a typed rejection.
 The user accepts the in-memory cooldown resetting on restart for v1.

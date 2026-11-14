@@ -207,3 +207,35 @@ Fixtures exercise these fields/overwrites and lost permissions without a Discord
 client or token. Context uses Task 3's complete request counters and accounting policy;
 no new “exact” billing claim, model alias or runtime package change is introduced.
 See [context/direct contracts](context-direct.md) for wiring, operational limits and tests.
+
+## Task 6 Discord compatibility — checked 14 November 2026
+
+[discord.js 14.28.1 registry metadata](https://registry.npmjs.org/discord.js/14.28.1)
+was checked before pinning the exact dependency and lockfile. Its Node >=18 requirement
+accepts our unchanged Node 26.13.1/npm 11.20.0. The SDK supplies gateway handling only;
+our single-attempt fixed-host REST adapter owns outgoing requests without SDK replay.
+TypeScript's library declarations now include ES2024 for the Unicode well-formed string
+methods already supported by pinned Node 26; the emitted target remains ES2023.
+
+Official maintained Discord API documentation source was read (no live API/token):
+
+- [Messages](https://github.com/discord/discord-api-docs/blob/main/developers/resources/message.mdx):
+  2,000-character content, explicit allowed_mentions, replied_user and message_reference.
+  We conservatively split at 2,000 UTF-16 units after plain-text escaping.
+- [Interactions](https://github.com/discord/discord-api-docs/blob/main/developers/interactions/receiving-and-responding.mdx):
+  three-second initial response deadline, 15-minute token life, deferred channel response
+  type 5 and immutable ephemeral flag 64; first-follow-up compatibility behaviour can
+  edit a deferred original and ignore the supplied ephemeral flag. Private follow-ups
+  are only attempted after the public original is confirmed complete.
+- [Application commands](https://github.com/discord/discord-api-docs/blob/main/developers/interactions/application-commands.mdx):
+  separate guild/global bulk replacement routes, guild interaction context and server
+  installation integration type. Registration is explicit, not a reconnect hook.
+- [Channels](https://github.com/discord/discord-api-docs/blob/main/developers/resources/channel.mdx):
+  typing expires after ten seconds; refreshing stops locally on every outcome.
+
+All calls in Task 6 acceptance tests use mocks with isolated PostgreSQL. Actual Discord
+notification delivery, command propagation, visibility and timing still need the separately
+authorized test-guild smoke test in [discord.md](discord.md). The existing CI matrix runs
+these tests on native AMD64 and ARM64; current PR results establish remote success only
+once those checks have completed on its latest commit. No live Discord registration/login
+or paid provider call is part of this verification.

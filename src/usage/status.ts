@@ -1,0 +1,1 @@
+export interface UsageStatus { resetAt: string; providers: readonly { provider: string; modelId: string | null; remaining: string; total: string; uncertain: string; reserved: string; requests: string; availability: string }[] }
