@@ -2,7 +2,7 @@
 
 Scope: backend services only. No HTTP routes, OAuth sessions, Discord startup, provider
 calls, SDK/model selection or deployment. Application startup still validates config and
-exits. Task 3 supplies the model catalog/provider worker; Task 7 supplies authenticated
+exits. Task 3 supplies the model catalog/provider adapter and usage services; Task 7 supplies authenticated
 web routes. The complete approved handoff remains unchanged.
 
 ## Access and current membership
@@ -81,8 +81,8 @@ when editing the allowlist, so counters are not inadvertently deleted.
 A new key is unfunded (`dailyAllowance=0`) with `modelId=null`. This is why migration 0001
 relaxes only the model NOT NULL constraint: no fabricated model ID or funded default.
 The injected `ModelSupport` must validate provider/model/effort plus context/generation
-bounds. Its default denies all selections. Tests use clearly synthetic model IDs; Task 3
-will supply the authoritative current catalog. A saved key is not a claim of live provider
+bounds. As of Task 3, SettingsService defaults to the verified catalog in
+`src/providers/catalog.ts`; tests can still inject synthetic model support. A saved key is not a claim of live provider
 validity or availability. Enablement requires at least one saved, supported, selected,
 positively funded provider. Lowering the last allowance to zero or removing its key
 automatically disables; an explicit invalid enable request fails.

@@ -18,7 +18,7 @@ export interface GuildSettings {
   autoChannels: string[]; providers: ProviderSettings[];
 }
 export interface ModelSelection { provider: ProviderId; modelId: string; effort: string | null; contextTokenLimit: number; maxGenerationTokens: number }
-/** Task 3 supplies an authoritative curated catalog. Absence of it fails closed. */
+/** Injectable curated model capability check; SettingsService defaults to the verified catalog. */
 export type ModelSupport = (selection: ModelSelection) => boolean;
 export const bounds = {
   humanContextLimit: [0, 100], selfContextLimit: [0, 20], contextTokenLimit: [1, 32000],

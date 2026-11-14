@@ -61,9 +61,12 @@ export const dailyUsage = pgTable('daily_usage', {
 ]);
 export const usageReservations = pgTable('usage_reservations', {
   id: uuid('id').defaultRandom().primaryKey(), guildId: guildId(), provider: provider(), utcDate: date('utc_date', { mode: 'string' }).notNull(),
+  configurationKey: text('configuration_key'), configurationRevision: integer('configuration_revision'),
+  knownInput: bigint('known_input', { mode: 'bigint' }), knownOutput: bigint('known_output', { mode: 'bigint' }),
+  knownReasoning: bigint('known_reasoning', { mode: 'bigint' }), knownTotal: bigint('known_total', { mode: 'bigint' }),
   reserved: bigint('reserved', { mode: 'bigint' }).notNull(), state: text('state', { enum: ['reserved', 'known', 'uncertain', 'not_sent'] }).default('reserved').notNull(),
   attemptId: uuid('attempt_id').notNull().unique(), createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
-}, (t) => [check('reservation_bounds', sql`${t.reserved} >= 0 AND ${t.provider} IN ('openai','google') AND ${t.state} IN ('reserved','known','uncertain','not_sent')`), index('reservation_guild_bucket').on(t.guildId,t.provider,t.utcDate)]);
+}, (t) => [check('reservation_known_counts',sql`(${t.knownInput} IS NULL AND ${t.knownOutput} IS NULL AND ${t.knownReasoning} IS NULL AND ${t.knownTotal} IS NULL) OR (${t.knownInput} IS NOT NULL AND ${t.knownOutput} IS NOT NULL AND ${t.knownReasoning} IS NOT NULL AND ${t.knownTotal} IS NOT NULL AND ${t.knownInput} >= 0 AND ${t.knownOutput} >= 0 AND ${t.knownReasoning} >= 0 AND ${t.knownReasoning} <= ${t.knownOutput} AND ${t.knownTotal} = ${t.knownInput}+${t.knownOutput})`),check('reservation_bounds', sql`${t.reserved} >= 0 AND ${t.provider} IN ('openai','google') AND ${t.state} IN ('reserved','known','uncertain','not_sent')`), index('reservation_guild_bucket').on(t.guildId,t.provider,t.utcDate)]);
 export const requestReceipts = pgTable('request_receipts', {
   guildId: guildId(), eventId: text('event_id').notNull(), state: text('state', { enum: ['accepted', 'processing', 'completed', 'uncertain', 'failed'] }).default('accepted').notNull(),
   createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
@@ -85,3 +88,9 @@ export const auditEvents = pgTable('audit_events', {
 export const operationalErrors = pgTable('operational_errors', {
   id: uuid('id').defaultRandom().primaryKey(), guildId: guildId(), provider: provider(), safeCode: text('safe_code').notNull(), correlationId: uuid('correlation_id').notNull(), createdAt: createdAt(),
 }, (t) => [check('operational_safe_code', sql`${t.provider} IN ('openai','google') AND ${t.safeCode} ~ '^[a-z0-9_]{1,64}$'`), index('errors_guild_created').on(t.guildId,t.createdAt)]);
+
+// Backoff is keyed by configuration revision; replacing a key/model permits a new probe.
+export const providerHealth = pgTable('provider_health', {
+  guildId: guildId(), provider: provider(), configurationRevision: integer('configuration_revision').notNull(), configurationKey: text('configuration_key').notNull(),
+  failures: integer('failures').default(0).notNull(), blocked: boolean('blocked').default(false).notNull(), nextRetryAt: time('next_retry_at'),
+}, t => [primaryKey({ columns: [t.guildId,t.provider] }),check('provider_health_bounds',sql`${t.provider} IN ('openai','google') AND ${t.failures} BETWEEN 0 AND 30 AND ${t.configurationRevision} > 0 AND ${t.configurationKey} ~ '^[0-9a-f]{64}$'`)]);

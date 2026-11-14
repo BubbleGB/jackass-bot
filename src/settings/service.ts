@@ -1,3 +1,4 @@
+import { supportsModel } from '../providers/catalog.js';
 import type { Pool, PoolClient } from 'pg';
 import type { Database } from '../db/index.js';
 import type { AccessLevel, ProviderId } from '../domain/types.js';
@@ -21,7 +22,7 @@ const fields = {
  * never a claimed identity from a browser body. No permission/session caches.
  */
 export class SettingsService implements CredentialService {
-  constructor(private readonly database: Database, private readonly access: AccessPolicy, private readonly cipher: CredentialCipher, private readonly modelSupport: ModelSupport = () => false) {}
+  constructor(private readonly database: Database, private readonly access: AccessPolicy, private readonly cipher: CredentialCipher, private readonly modelSupport: ModelSupport = supportsModel) {}
   private async transaction<T>(guildId: string, action: (client: PoolClient) => Promise<T>): Promise<T> {
     if (!isSnowflake(guildId)) throw new SettingsError('invalid_settings');
     let client: PoolClient | undefined;

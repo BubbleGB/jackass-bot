@@ -1,0 +1,1241 @@
+{
+  "id": "4ae8d857-442a-48fb-b09f-1567a9a92ced",
+  "prevId": "b62806a4-aa31-41fe-ab91-f5893588e304",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.access_grants": {
+      "name": "access_grants",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_type": {
+          "name": "subject_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_by": {
+          "name": "granted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "access_grants_guild_id_guild_settings_guild_id_fk": {
+          "name": "access_grants_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "access_grants",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "access_grants_guild_id_subject_type_subject_id_pk": {
+          "name": "access_grants_guild_id_subject_type_subject_id_pk",
+          "columns": [
+            "guild_id",
+            "subject_type",
+            "subject_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "access_subject_type": {
+          "name": "access_subject_type",
+          "value": "\"access_grants\".\"subject_type\" IN ('user','role')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.approved_guilds": {
+      "name": "approved_guilds",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_events": {
+      "name": "audit_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_guild_id": {
+          "name": "target_guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_fields": {
+          "name": "changed_fields",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_guild_created": {
+          "name": "audit_guild_created",
+          "columns": [
+            {
+              "expression": "guild_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_events_guild_id_guild_settings_guild_id_fk": {
+          "name": "audit_events_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "audit_target_snowflake": {
+          "name": "audit_target_snowflake",
+          "value": "\"audit_events\".\"target_guild_id\" IS NULL OR \"audit_events\".\"target_guild_id\" ~ '^[0-9]{17,20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.auto_channels": {
+      "name": "auto_channels",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "auto_channels_guild_id_guild_settings_guild_id_fk": {
+          "name": "auto_channels_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "auto_channels",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "auto_channels_guild_id_channel_id_pk": {
+          "name": "auto_channels_guild_id_channel_id_pk",
+          "columns": [
+            "guild_id",
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.channel_state": {
+      "name": "channel_state",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_count": {
+          "name": "pending_count",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "assessment_snapshot": {
+          "name": "assessment_snapshot",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assessment_id": {
+          "name": "assessment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assessment_started_at": {
+          "name": "assessment_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_success_at": {
+          "name": "last_success_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "channel_state_guild_id_guild_settings_guild_id_fk": {
+          "name": "channel_state_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "channel_state",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_state_guild_id_channel_id_auto_channels_guild_id_channel_id_fk": {
+          "name": "channel_state_guild_id_channel_id_auto_channels_guild_id_channel_id_fk",
+          "tableFrom": "channel_state",
+          "tableTo": "auto_channels",
+          "columnsFrom": [
+            "guild_id",
+            "channel_id"
+          ],
+          "columnsTo": [
+            "guild_id",
+            "channel_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "channel_state_guild_id_channel_id_pk": {
+          "name": "channel_state_guild_id_channel_id_pk",
+          "columns": [
+            "guild_id",
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "channel_state_counts": {
+          "name": "channel_state_counts",
+          "value": "\"channel_state\".\"pending_count\" >= 0 AND (\"channel_state\".\"assessment_snapshot\" IS NULL OR (\"channel_state\".\"assessment_snapshot\" >= 0 AND \"channel_state\".\"assessment_snapshot\" <= \"channel_state\".\"pending_count\"))"
+        },
+        "channel_state_assessment": {
+          "name": "channel_state_assessment",
+          "value": "(\"channel_state\".\"assessment_snapshot\" IS NULL AND \"channel_state\".\"assessment_id\" IS NULL AND \"channel_state\".\"assessment_started_at\" IS NULL) OR (\"channel_state\".\"assessment_snapshot\" IS NOT NULL AND \"channel_state\".\"assessment_id\" IS NOT NULL AND \"channel_state\".\"assessment_started_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.daily_usage": {
+      "name": "daily_usage",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "utc_date": {
+          "name": "utc_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input_tokens": {
+          "name": "input_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "output_tokens": {
+          "name": "output_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "reasoning_tokens": {
+          "name": "reasoning_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "total_tokens": {
+          "name": "total_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "uncertain_tokens": {
+          "name": "uncertain_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "reserved_tokens": {
+          "name": "reserved_tokens",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "requests": {
+          "name": "requests",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "daily_usage_guild_id_guild_settings_guild_id_fk": {
+          "name": "daily_usage_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "daily_usage",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "daily_usage_guild_id_provider_utc_date_pk": {
+          "name": "daily_usage_guild_id_provider_utc_date_pk",
+          "columns": [
+            "guild_id",
+            "provider",
+            "utc_date"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "daily_usage_nonnegative": {
+          "name": "daily_usage_nonnegative",
+          "value": "\"daily_usage\".\"provider\" IN ('openai','google') AND \"daily_usage\".\"input_tokens\" >= 0 AND \"daily_usage\".\"output_tokens\" >= 0 AND \"daily_usage\".\"reasoning_tokens\" >= 0 AND \"daily_usage\".\"total_tokens\" >= 0 AND \"daily_usage\".\"uncertain_tokens\" >= 0 AND \"daily_usage\".\"reserved_tokens\" >= 0 AND \"daily_usage\".\"requests\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.guild_settings": {
+      "name": "guild_settings",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "instructions": {
+          "name": "instructions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "direct_enabled": {
+          "name": "direct_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "human_context_limit": {
+          "name": "human_context_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "self_context_limit": {
+          "name": "self_context_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "context_token_limit": {
+          "name": "context_token_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 8000
+        },
+        "auto_policy": {
+          "name": "auto_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'conditional'"
+        },
+        "auto_gap_seconds": {
+          "name": "auto_gap_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 60
+        },
+        "auto_threshold": {
+          "name": "auto_threshold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "answer_target_tokens": {
+          "name": "answer_target_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 400
+        },
+        "max_generation_tokens": {
+          "name": "max_generation_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 2048
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "guild_settings_snowflake": {
+          "name": "guild_settings_snowflake",
+          "value": "\"guild_settings\".\"guild_id\" ~ '^[0-9]{17,20}$'"
+        },
+        "guild_settings_bounds": {
+          "name": "guild_settings_bounds",
+          "value": "length(\"guild_settings\".\"instructions\") <= 8000 AND \"guild_settings\".\"human_context_limit\" BETWEEN 0 AND 100 AND \"guild_settings\".\"self_context_limit\" BETWEEN 0 AND 20 AND \"guild_settings\".\"context_token_limit\" BETWEEN 1 AND 32000 AND \"guild_settings\".\"auto_gap_seconds\" BETWEEN 5 AND 3600 AND \"guild_settings\".\"auto_threshold\" BETWEEN 1 AND 10000 AND \"guild_settings\".\"revision\" > 0 AND \"guild_settings\".\"answer_target_tokens\" > 0 AND \"guild_settings\".\"max_generation_tokens\" >= \"guild_settings\".\"answer_target_tokens\""
+        },
+        "guild_settings_policy": {
+          "name": "guild_settings_policy",
+          "value": "\"guild_settings\".\"auto_policy\" IN ('conditional','always')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.operational_errors": {
+      "name": "operational_errors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "safe_code": {
+          "name": "safe_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correlation_id": {
+          "name": "correlation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "errors_guild_created": {
+          "name": "errors_guild_created",
+          "columns": [
+            {
+              "expression": "guild_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "operational_errors_guild_id_guild_settings_guild_id_fk": {
+          "name": "operational_errors_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "operational_errors",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "operational_safe_code": {
+          "name": "operational_safe_code",
+          "value": "\"operational_errors\".\"provider\" IN ('openai','google') AND \"operational_errors\".\"safe_code\" ~ '^[a-z0-9_]{1,64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.provider_configs": {
+      "name": "provider_configs",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nonce": {
+          "name": "nonce",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "effort": {
+          "name": "effort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "daily_allowance": {
+          "name": "daily_allowance",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "provider_configs_guild_id_guild_settings_guild_id_fk": {
+          "name": "provider_configs_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "provider_configs",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "provider_configs_guild_id_provider_pk": {
+          "name": "provider_configs_guild_id_provider_pk",
+          "columns": [
+            "guild_id",
+            "provider"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "provider_priority_unique": {
+          "name": "provider_priority_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "guild_id",
+            "priority"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "provider_config_bounds": {
+          "name": "provider_config_bounds",
+          "value": "\"provider_configs\".\"provider\" IN ('openai','google') AND \"provider_configs\".\"priority\" BETWEEN 1 AND 2 AND \"provider_configs\".\"daily_allowance\" >= 0 AND \"provider_configs\".\"revision\" > 0 AND \"provider_configs\".\"key_version\" > 0 AND (\"provider_configs\".\"model_id\" IS NULL OR length(\"provider_configs\".\"model_id\") BETWEEN 1 AND 200) AND octet_length(\"provider_configs\".\"nonce\") = 12 AND octet_length(\"provider_configs\".\"ciphertext\") > 16"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.provider_health": {
+      "name": "provider_health",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "configuration_revision": {
+          "name": "configuration_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "configuration_key": {
+          "name": "configuration_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failures": {
+          "name": "failures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "blocked": {
+          "name": "blocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "provider_health_guild_id_guild_settings_guild_id_fk": {
+          "name": "provider_health_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "provider_health",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "provider_health_guild_id_provider_pk": {
+          "name": "provider_health_guild_id_provider_pk",
+          "columns": [
+            "guild_id",
+            "provider"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "provider_health_bounds": {
+          "name": "provider_health_bounds",
+          "value": "\"provider_health\".\"provider\" IN ('openai','google') AND \"provider_health\".\"failures\" BETWEEN 0 AND 30 AND \"provider_health\".\"configuration_revision\" > 0 AND \"provider_health\".\"configuration_key\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.request_receipts": {
+      "name": "request_receipts",
+      "schema": "",
+      "columns": {
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'accepted'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "request_receipts_guild_id_guild_settings_guild_id_fk": {
+          "name": "request_receipts_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "request_receipts",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "request_receipts_guild_id_event_id_pk": {
+          "name": "request_receipts_guild_id_event_id_pk",
+          "columns": [
+            "guild_id",
+            "event_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "receipt_state": {
+          "name": "receipt_state",
+          "value": "\"request_receipts\".\"state\" IN ('accepted','processing','completed','uncertain','failed')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.usage_reservations": {
+      "name": "usage_reservations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "guild_id": {
+          "name": "guild_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "utc_date": {
+          "name": "utc_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "configuration_key": {
+          "name": "configuration_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "configuration_revision": {
+          "name": "configuration_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "known_input": {
+          "name": "known_input",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "known_output": {
+          "name": "known_output",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "known_reasoning": {
+          "name": "known_reasoning",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "known_total": {
+          "name": "known_total",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reserved": {
+          "name": "reserved",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'reserved'"
+        },
+        "attempt_id": {
+          "name": "attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "reservation_guild_bucket": {
+          "name": "reservation_guild_bucket",
+          "columns": [
+            {
+              "expression": "guild_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "utc_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "usage_reservations_guild_id_guild_settings_guild_id_fk": {
+          "name": "usage_reservations_guild_id_guild_settings_guild_id_fk",
+          "tableFrom": "usage_reservations",
+          "tableTo": "guild_settings",
+          "columnsFrom": [
+            "guild_id"
+          ],
+          "columnsTo": [
+            "guild_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usage_reservations_attempt_id_unique": {
+          "name": "usage_reservations_attempt_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "attempt_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "reservation_known_counts": {
+          "name": "reservation_known_counts",
+          "value": "(\"usage_reservations\".\"known_input\" IS NULL AND \"usage_reservations\".\"known_output\" IS NULL AND \"usage_reservations\".\"known_reasoning\" IS NULL AND \"usage_reservations\".\"known_total\" IS NULL) OR (\"usage_reservations\".\"known_input\" IS NOT NULL AND \"usage_reservations\".\"known_output\" IS NOT NULL AND \"usage_reservations\".\"known_reasoning\" IS NOT NULL AND \"usage_reservations\".\"known_total\" IS NOT NULL AND \"usage_reservations\".\"known_input\" >= 0 AND \"usage_reservations\".\"known_output\" >= 0 AND \"usage_reservations\".\"known_reasoning\" >= 0 AND \"usage_reservations\".\"known_reasoning\" <= \"usage_reservations\".\"known_output\" AND \"usage_reservations\".\"known_total\" = \"usage_reservations\".\"known_input\"+\"usage_reservations\".\"known_output\")"
+        },
+        "reservation_bounds": {
+          "name": "reservation_bounds",
+          "value": "\"usage_reservations\".\"reserved\" >= 0 AND \"usage_reservations\".\"provider\" IN ('openai','google') AND \"usage_reservations\".\"state\" IN ('reserved','known','uncertain','not_sent')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.web_sessions": {
+      "name": "web_sessions",
+      "schema": "",
+      "columns": {
+        "session_hash": {
+          "name": "session_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_ciphertext": {
+          "name": "token_ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_nonce": {
+          "name": "token_nonce",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_key_version": {
+          "name": "token_key_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "session_expiry_idx": {
+          "name": "session_expiry_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "session_hash_format": {
+          "name": "session_hash_format",
+          "value": "\"web_sessions\".\"session_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "session_token_envelope": {
+          "name": "session_token_envelope",
+          "value": "(\"web_sessions\".\"token_ciphertext\" IS NULL AND \"web_sessions\".\"token_nonce\" IS NULL AND \"web_sessions\".\"token_key_version\" IS NULL) OR (\"web_sessions\".\"token_ciphertext\" IS NOT NULL AND \"web_sessions\".\"token_nonce\" IS NOT NULL AND \"web_sessions\".\"token_key_version\" IS NOT NULL AND octet_length(\"web_sessions\".\"token_ciphertext\") > 16 AND octet_length(\"web_sessions\".\"token_nonce\") = 12 AND \"web_sessions\".\"token_key_version\" > 0)"
+        },
+        "session_expiry": {
+          "name": "session_expiry",
+          "value": "\"web_sessions\".\"expires_at\" > \"web_sessions\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

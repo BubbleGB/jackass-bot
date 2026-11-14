@@ -2,6 +2,27 @@
 
 Date: 13 November 2026. Owner: BubbleGB. Repository: https://github.com/BubbleGB/jackass-bot
 
+## User amendment — 13 November 2026 (supersedes earlier accounting requirement)
+
+Daily token allowances are practical usage safeguards, not guaranteed hard billing caps.
+This amendment explicitly supersedes the earlier A4 requirement to reject models whose
+accounting cannot be reliably bounded. Keep both OpenAI and Google. Use documented
+request token counting where supported, include countable instructions, history and
+structured-output content, and reserve estimated input plus the enforced total generation
+limit. Document any margin as an engineering estimate, never a guaranteed upper bound.
+Verify OpenAI count payload coverage rather than assuming that “exact” covers the request.
+
+Keep context/request limits, atomic reservations, concurrency safeguards and conservative
+timeout charges. Reconcile all reported actual usage, including amounts above reservations;
+block further calls once the allowance is exhausted. Estimation error and concurrent
+in-flight requests can overshoot the allowance. Never silently raise configured allowances.
+The current implementation and assumptions are in [providers-usage.md](providers-usage.md)
+and [google-reservation-investigation.md](google-reservation-investigation.md).
+
+Development/testing moved to Codex Cloud at `/workspace/jackass-bot`; Termux setup below
+is historical. The Oracle VPS remains the eventual deployment target. PR #3 stays unmerged;
+no Task 4, paid calls, production keys, VPS access or deployment is authorized by this amendment.
+
 ## Read this first
 
 The user approved the consolidated design in chat. No application code has been implemented here. This file contains the approved requirements and phased implementation plan. Numerical defaults explicitly labelled below are engineering proposals, not previously requested values. Do not silently widen the scope.
@@ -61,7 +82,7 @@ Save both OpenAI and Google keys; staff choose priority. Each has its own suppor
 
 Fallback on local allowance exhaustion, provider credit/quota exhaustion, rate limits and temporary availability errors. Do not fallback to evade safety refusals. Invalid credentials/model configuration should surface as actionable staff errors; prevent repeated failing attempts and permit the other configured provider where applicable. One request tries each eligible provider at most once; respect Retry-After and bounded timeouts. Periodic recovery means an eligible future request can probe a provider after its backoff, not autonomous paid test calls.
 
-Allowances reset at 00:00 UTC, explicitly shown in UI. Atomically reserve conservative input/output usage before calls, including bounded hidden reasoning where model accounting requires it. If token accounting cannot be bounded reliably, fail closed for that model rather than claim a strict cap. Reconcile known usage without double counting cached input or reasoning already included in output totals. For timeouts with uncertain billing, retain a conservative charge/reservation and label it uncertain; do not release it as definitely free. Track each provider attempt separately, including a failed primary followed by a successful fallback. These are local safeguards, not exact monetary caps or guarantees about provider billing.
+Allowances reset at 00:00 UTC, explicitly shown in UI. They are practical usage safeguards, not guaranteed hard billing caps. Atomically reserve estimated input plus the enforced total generation limit, including hidden reasoning where model accounting requires it. Use the documented request-counting facility where supported and include countable instructions, history and structured-output content. Label additional margins as engineering estimates, not guaranteed upper bounds. The user amendment above supersedes the earlier reject-unbounded-model requirement: lack of a guaranteed input accounting bound alone must not disable a model. Reconcile the full reported actual usage without double counting cached input or reasoning already included in output totals, even when actual usage exceeds the reservation. Stop further calls once known usage plus uncertain charges and reservations exhausts the configured allowance. Estimates and already in-flight requests can cause overshoot; never silently increase the allowance. For timeouts with uncertain billing, retain the estimated reservation and label it uncertain; it is not proof of the maximum billed usage and must not be released as definitely free. Track each provider attempt separately, including a failed primary followed by a successful fallback.
 
 When all eligible providers are exhausted/unavailable, stop automatic messages silently and give a brief rate-limited direct-request notice without an AI call. Never regenerate merely because Discord delivery failed; retry delivery boundedly using the already-generated response in memory. After a crash, do not regenerate uncertain delivery automatically.
 
@@ -202,7 +223,7 @@ Interfaces: `ProviderAdapter.generate(input: GenerationInput, credential: string
 
 - [ ] Verify exact model IDs/effort/usage APIs; write fixture tests for both adapters, including reasoning and cached-token non-double-counting, empty response vs explicit silence, and refusal.
 - [ ] Implement a small curated catalog and adapters with request limits, cancellation, safe errors and no external tools.
-- [ ] Write PostgreSQL concurrency tests: two reservations cannot overspend; repeated settle idempotent; midnight settlement belongs to original bucket; uncertain timeout does not free reserved usage; success on fallback records both attempts correctly.
+- [ ] Write PostgreSQL concurrency tests: concurrent estimates cannot be admitted above the allowance; underestimated actual usage is recorded in full, including concurrent overshoot, and blocks further calls after exhaustion without raising allowances; repeated settle idempotent; midnight settlement belongs to original bucket; uncertain timeout does not free reserved usage; success on fallback records both attempts correctly.
 - [ ] Implement atomic reservations and bounded provider routing/backoff. Test priority, quota fallback, rate-limit recovery and no safety-refusal fallback.
 - [ ] Run unit/integration checks, typecheck and lint; commit `feat: add bounded AI providers and usage accounting`.
 
