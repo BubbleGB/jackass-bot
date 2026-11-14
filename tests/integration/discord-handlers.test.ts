@@ -25,7 +25,7 @@ describe('Discord handlers through existing context, queue, access and ledger se
   });
   afterAll(async () => { await db?.close(); try { await admin.query(`DROP DATABASE IF EXISTS "${name}"`); } finally { await admin.end(); } });
   async function fixture() {
-    let time = instant.getTime(),generations = 0,permission = true,member = true;
+    let time = instant.getTime(),generations = 0,permission = true,member = true,verificationLimited = false;
     let inputCount = 120;
     let text = 'Hello',failProvider = false,sends = 0,loseOnAnswer = false,loseWorker = false;
     const reports: import('../../src/discord/delivery.js').DeliveryReport[] = [];
@@ -40,8 +40,8 @@ describe('Discord handlers through existing context, queue, access and ledger se
         }
         if (r.path === `/channels/${channel}`) return { id: channel,guild_id: guild,type: 0,permission_overwrites: permission ? [] : [{ id: bot,type: 1,allow: '0',deny: '1024' }] };
         if (r.path === `/guilds/${guild}`) return { id: guild,owner_id: user };
-        if (r.path === `/guilds/${guild}/roles`) return [{ id: guild,permissions: '68608' }];
-        if (r.path === `/guilds/${guild}/members/${user}`) { if (!member) throw new Error('member left'); return { user: { id: user,bot: false },roles: [] }; }
+        if (r.path === `/guilds/${guild}/roles`) { if (verificationLimited) throw new DiscordFailure('rate_limited'); return [{ id: guild,permissions: '68608' }]; }
+        if (r.path === `/guilds/${guild}/members/${user}`) { if (!member) throw new DiscordFailure('forbidden'); return { user: { id: user,bot: false },roles: [] }; }
         if (r.path === `/guilds/${guild}/members/${bot}`) return { user: { id: bot,bot: true },roles: [] };
         if (r.path.includes('/messages?')) return [];
         const messageId = r.path.split('/').at(-1)!,kind = messages.get(messageId) ?? 'ordinary';
@@ -59,6 +59,7 @@ describe('Discord handlers through existing context, queue, access and ledger se
     const app = createDiscordApplication({ database: db,onDelivery: (_r,report) => { reports.push(report); },botId: bot,creatorId: user,publicOrigin: 'https://example.test',encryptionKey: key,keyVersion: 1,transport,providers: new Map([['openai',provider]]),now: () => new Date(time),delay: async () => undefined });
     expect(await app.start()).toBe(true);
     return { app,calls,reports,failSends,generations: () => generations,sends: () => sends,setText(t: string) { text = t; },oversizeInput() { inputCount = 500000; },failProvider() { failProvider = true; },losePermissions() { loseOnAnswer = true; },loseWorkerDuringDelivery() { loseWorker = true; },revokeMember() { member = false; },advance(n: number) { time += n; },
+      limitVerification() { verificationLimited = true; },
       async message(n: number,kind: 'mention' | 'reply' | 'ordinary') { messages.set(id(n),kind); await app.handlers.handleMessage({ id: id(n),guildId: guild,channelId: channel,channelType: 0,userId: user,bot: false,webhookId: null }); },
       interaction(n: number,command = 'ask') { return { id: id(n),applicationId: '999999999999999999',token: `fake-token-${n}`,guildId: guild,channelId: channel,userId: user,channelType: 0,command,prompt: 'Hi' }; },
     };
@@ -83,6 +84,13 @@ describe('Discord handlers through existing context, queue, access and ledger se
       f.revokeMember(); await f.app.handlers.handleInteraction(f.interaction(3,'settings'));
       expect(f.calls.at(-1)?.body).toMatchObject({ content: expect.stringContaining('access') });
       expect(f.calls.filter(c => c.path.endsWith('/callback')).slice(1).every(c => (c.body as { data: { flags: number } }).data.flags === 64)).toBe(true);
+    } finally { await f.app.stop(); }
+  });
+  it('explains a temporary staff-command verification failure without claiming provider exhaustion',async () => {
+    const f = await fixture(); try { f.limitVerification(); await f.app.handlers.handleInteraction(f.interaction(1,'settings'));
+      expect(f.calls.at(-1)?.body).toMatchObject({ content: expect.stringMatching(/verification.*temporarily unavailable/i) });
+      expect(JSON.stringify(f.calls.at(-1)?.body)).not.toContain('allowance'); expect(f.generations()).toBe(0);
+      expect(f.calls.find(c => c.path.endsWith('/callback'))?.body).toMatchObject({ type: 5,data: { flags: 64 } });
     } finally { await f.app.stop(); }
   });
   it.each(['ask','mention'] as const)('preserves the typed oversized-input result through the real %s queue handler',async kind => {

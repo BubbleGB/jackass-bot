@@ -11,9 +11,11 @@ import type { DashboardDirectory } from './directory.js';
 import type { OAuth } from './oauth.js';
 import { WebAuth,returnPath } from './auth.js';
 import { routes } from './routes.js';
+export interface WebDiagnostic { route: string; status: number; timingMs: number; category: string }
 export interface WebDependencies {
   database: Database; access: AccessPolicy; settings: SettingsService; directory: DashboardDirectory; oauth: OAuth;
   origin: string; clientId: string; sessionSecret: Buffer; contactUrl?: string; now?: () => Date; assets?: string;
+  diagnostics?: (entry: WebDiagnostic) => void;
 }
 export interface WebIdentity { actor: string; token: string }
 export async function createWebServer(d: WebDependencies): Promise<FastifyInstance> {
@@ -21,13 +23,22 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   if (origin.origin !== d.origin || origin.username || origin.password || (!secure && !['localhost','127.0.0.1','[::1]'].includes(origin.hostname)) || !isSnowflake(d.clientId)) throw new Error('web_configuration');
   if (d.contactUrl !== undefined && !validContactUrl(d.contactUrl)) throw new Error('web_configuration');
   const app = Fastify({ logger: false,bodyLimit: 32768,trustProxy: false,requestTimeout: 15000 });
+  const failureCategories = new WeakMap<FastifyRequest,string>();
+  const diagnosticRoutes = new Set(['settings','channels','status','errors','grants','providers/:provider/key'].map(p => '/api/guilds/:guildId/'+p));
+  app.addHook('onResponse',async (r,reply) => {
+    const route = r.routeOptions.url;
+    if (reply.statusCode < 400 || !route || !diagnosticRoutes.has(route)) return;
+    const entry: WebDiagnostic = { route,status: reply.statusCode,timingMs: Math.max(0,Math.round(reply.elapsedTime)),category: failureCategories.get(r) ?? 'request_failed' };
+    try { if (d.diagnostics) d.diagnostics(entry); else console.info(JSON.stringify(entry)); } catch { /* Diagnostics must not affect authorization or responses. */ }
+  });
   const auth = new WebAuth(d.database,d.sessionSecret,d.now ?? (() => new Date())),sessionName = secure ? '__Host-gn_session' : 'gn_session',stateName = secure ? '__Host-gn_state' : 'gn_state';
   const options = { path: '/',httpOnly: true,sameSite: 'lax' as const,secure };
   await app.register(cookie); await app.register(rateLimit,{ global: true,max: 300,timeWindow: '1 minute',allowList: r => !r.url.startsWith('/api/') && !r.url.startsWith('/auth/') });
   app.addHook('onRequest',async (_r,reply) => { reply.header('cache-control','no-store').header('referrer-policy','no-referrer').header('x-content-type-options','nosniff').header('x-frame-options','DENY').header('content-security-policy',"default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"); });
-  app.setErrorHandler((e,_r,reply) => {
+  app.setErrorHandler((e,r,reply) => {
     const code = e instanceof SettingsError ? e.code : (e as { statusCode?: number }).statusCode === 429 ? 'rate_limited' : 'request_failed';
-    reply.status(code === 'forbidden' ? 403 : code === 'revision_conflict' ? 409 : code === 'rate_limited' ? 429 : code === 'storage_failed' ? 503 : 400).send({ error: code });
+    failureCategories.set(r,e instanceof SettingsError && code === 'verification_unavailable' ? 'verification_'+(e.reason ?? 'unavailable') : code);
+    reply.status(code === 'forbidden' ? 403 : code === 'revision_conflict' ? 409 : code === 'rate_limited' ? 429 : ['storage_failed','verification_unavailable'].includes(code) ? 503 : 400).send({ error: code });
   });
   const identity = async (r: FastifyRequest): Promise<WebIdentity | null> => { const token = r.cookies[sessionName]; const actor = await auth.identify(token); return actor && token ? { actor,token } : null; };
   app.get('/auth/discord',{ config: { rateLimit: { max: 20,timeWindow: '10 minutes' } } },async (r,reply) => {
@@ -44,8 +55,8 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   app.get('/api/site',async () => ({ contactUrl: d.contactUrl ?? null,inviteUrl: `https://discord.com/oauth2/authorize?${new URLSearchParams({ client_id: d.clientId,scope: 'bot applications.commands',permissions: '84992',integration_type: '0' })}` }));
   app.addHook('preHandler',async (r,reply) => {
     if (!r.url.startsWith('/api/') || r.url.split('?')[0] === '/api/site') return;
-    const i = await identity(r); if (!i) return reply.status(401).send({ error: 'sign_in_required' });
-    if (!['GET','HEAD'].includes(r.method) && (r.headers.origin !== d.origin || !auth.verifyCsrf(i.token,r.headers['x-csrf-token']))) return reply.status(403).send({ error: 'csrf_failed' });
+    const i = await identity(r); if (!i) { failureCategories.set(r,'sign_in_required'); return reply.status(401).send({ error: 'sign_in_required' }); }
+    if (!['GET','HEAD'].includes(r.method) && (r.headers.origin !== d.origin || !auth.verifyCsrf(i.token,r.headers['x-csrf-token']))) { failureCategories.set(r,'csrf_failed'); return reply.status(403).send({ error: 'csrf_failed' }); }
   });
   app.get('/api/session',async r => { const i = (await identity(r))!; return { userId: i.actor,creator: i.actor === d.access.creatorId,csrf: auth.csrf(i.token) }; });
   app.post('/auth/logout',async (r,reply) => { const i = await identity(r); if (!i || r.headers.origin !== d.origin || !auth.verifyCsrf(i.token,r.headers['x-csrf-token'])) return reply.status(403).send({ error: 'csrf_failed' }); await auth.remove(i.token); reply.clearCookie(sessionName,options); return reply.status(204).send(); });

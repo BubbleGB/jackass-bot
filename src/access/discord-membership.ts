@@ -1,3 +1,8 @@
+import { DiscordFailure } from '../discord/transport.js';
+export type VerificationReason = 'timeout' | 'rate_limited' | 'unavailable' | 'invalid_response';
+export class MembershipVerificationError extends Error {
+  constructor(readonly reason: VerificationReason) { super('verification_unavailable'); this.name = 'MembershipVerificationError'; }
+}
 export interface MembershipSnapshot {
   guildId: string; userId: string; ownerId: string; botPresent: boolean;
   roleIds: readonly string[]; roles: readonly { id: string; permissions: string }[];
@@ -23,7 +28,7 @@ export class DiscordMembership implements MembershipRepository {
     const abort = () => controller.abort();
     try {
       const timeout = new Promise<never>((_resolve, reject) => {
-        controller.signal.addEventListener('abort',() => reject(new Error('discord_lookup_failed')),{ once: true });
+        controller.signal.addEventListener('abort',() => reject(new MembershipVerificationError('timeout')),{ once: true });
         signal?.addEventListener('abort',abort,{ once: true });
         if (signal?.aborted) controller.abort();
         timer = setTimeout(abort,5000);
@@ -34,20 +39,31 @@ export class DiscordMembership implements MembershipRepository {
   }
   async lookup(userId: string, guildId: string): Promise<MembershipSnapshot | null> {
     if (![userId, guildId, this.botId].every(snowflake)) return null;
+    let values: unknown[];
     try {
-      const [g, m, b, r] = await Promise.all([
+      values = await Promise.all([
         this.request(`/guilds/${guildId}`), this.request(`/guilds/${guildId}/members/${userId}`),
         this.request(`/guilds/${guildId}/members/${this.botId}`), this.request(`/guilds/${guildId}/roles`),
       ]);
+    } catch (e) {
+      if (e instanceof DiscordFailure && e.kind === 'forbidden') return null;
+      if (e instanceof MembershipVerificationError) throw e;
+      throw new MembershipVerificationError(e instanceof DiscordFailure && e.kind === 'rate_limited' ? 'rate_limited' : 'unavailable');
+    }
+    try {
+      const [g,m,b,r] = values;
       const guild = record(g), member = record(m), bot = record(b);
-      if (guild.id !== guildId || !snowflake(guild.owner_id) || record(member.user).id !== userId || record(bot.user).id !== this.botId || !Array.isArray(member.roles) || !member.roles.every(snowflake) || !Array.isArray(r)) return null;
+      const actorUser = record(member.user),botUser = record(bot.user);
+      if (![guild.id,actorUser.id,botUser.id].every(snowflake)) throw new Error('discord_lookup_failed');
+      if (guild.id !== guildId || actorUser.id !== userId || botUser.id !== this.botId) return null;
+      if (!snowflake(guild.owner_id) || !Array.isArray(member.roles) || !member.roles.every(snowflake) || !Array.isArray(r)) throw new Error('discord_lookup_failed');
       const roles = r.map((value) => {
         const role = record(value);
         if (!snowflake(role.id) || typeof role.permissions !== 'string' || !/^\d+$/.test(role.permissions)) throw new Error('discord_lookup_failed');
         return { id: role.id, permissions: role.permissions };
       });
       return { guildId, userId, ownerId: guild.owner_id, botPresent: true, roleIds: member.roles as string[], roles };
-    } catch { return null; }
+    } catch { throw new MembershipVerificationError('invalid_response'); }
   }
   async isTextChannel(guildId: string, channelId: string, signal?: AbortSignal): Promise<boolean> {
     if (![guildId, channelId].every(snowflake)) return false;

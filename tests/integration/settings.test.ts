@@ -86,7 +86,7 @@ describe('settings/credentials against isolated PostgreSQL', () => {
     expect((await settings(delegate)).guildId).toBe(guild);
     roleRevoked = true; await expect(settings(delegate)).rejects.toThrow('forbidden'); roleRevoked = false;
     departed = true; await expect(settings(delegate)).rejects.toThrow('forbidden'); departed = false;
-    lookupFails = true; await expect(settings(owner)).rejects.toThrow('forbidden'); lookupFails = false;
+    lookupFails = true; await expect(settings(owner)).rejects.toThrow('verification_unavailable'); lookupFails = false;
     await service.setApproval(creator, guild, false); await expect(settings(owner)).rejects.toThrow('forbidden');
     await expect(service.setApproval(owner, guild, true)).rejects.toThrow('forbidden');
   });

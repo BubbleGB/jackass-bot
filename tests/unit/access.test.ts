@@ -31,7 +31,7 @@ describe('current guild access policy', () => {
   });
   it('fails closed on Discord lookup errors', async () => {
     const { policy, membership } = fixture(); membership.lookup = async () => { throw new Error('private response'); };
-    expect(await policy.resolveAccess(user, guild)).toBe('none');
+    await expect(policy.resolveAccess(user, guild)).rejects.toMatchObject({ code: 'verification_unavailable' });
   });
   it('checks current membership on each operation, losing a revoked role immediately', async () => {
     const { policy, membership } = fixture(snapshot({ roleIds: [role] }), true, [{ subjectType: 'role', subjectId: role }]);

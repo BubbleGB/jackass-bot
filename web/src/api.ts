@@ -9,8 +9,11 @@ export async function api<T>(path: string,method = 'GET',body?: unknown): Promis
 export function explain(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 401) return 'Your session expired. Sign in again; your settings draft remains in this tab.';
-    if (e.status === 403) return 'Your current access could not be verified. Ask an owner to check your role, then sign in again.';
+    if (e.code === 'verification_unavailable') return 'Discord access verification is temporarily unavailable. Try again shortly; your draft is kept in this tab.';
+    if (e.code === 'csrf_failed') return 'The security check failed. Reload the page and try again; your draft is kept in this tab.';
+    if (e.status === 403) return 'Your current server access was denied. Ask an owner to check your membership, role and the bot’s access.';
     if (e.status === 429) return 'Too many requests. Wait a minute, then try again.';
+    if (e.code === 'storage_failed') return 'Server data is temporarily unavailable. Try again shortly; your draft is kept in this tab.';
     if (e.code === 'not_configured') return 'The bot has not initialized this server yet. Ask the owner to check its installation.';
     if (e.code === 'invalid_settings') return 'Check the field limits, supported model and effort, and ensure the answer target does not exceed the generation limit. An enabled server needs a model and positive allowance.';
     if (e.code === 'credential_invalid') return 'Enter a valid provider key. It will only be saved, never returned.';

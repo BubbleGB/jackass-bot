@@ -115,6 +115,7 @@ export class DiscordHandlers {
       if (resolved || this.interactions.get(i.id)?.handled) return; // Never overwrite delivered chunks after a delivery/notice failure.
       try {
         if (e instanceof SettingsError && e.code === 'forbidden') await this.privateNotice(i,'You do not have current access to this server command.',publicDefer);
+        else if (e instanceof SettingsError && e.code === 'verification_unavailable') await this.privateNotice(i,'Discord access verification is temporarily unavailable. Please try again shortly.',publicDefer);
         else await this.unavailable(i,r,publicDefer);
       } catch { /* Transport failures never cause regeneration or secret-bearing logs. */ }
     } finally { this.interactions.delete(i.id); }
