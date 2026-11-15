@@ -26,13 +26,13 @@ const fields = {
  */
 export class SettingsService implements CredentialService {
   constructor(private readonly database: Database, private readonly access: AccessPolicy, private readonly cipher: CredentialCipher, private readonly modelSupport: ModelSupport = supportsModel) {}
-  private async transaction<T>(guildId: string, action: (client: PoolClient) => Promise<T>): Promise<T> {
+  private async transaction<T>(guildId: string, action: (client: PoolClient) => Promise<T>,read = false): Promise<T> {
     if (!isSnowflake(guildId)) throw new SettingsError('invalid_settings');
     let client: PoolClient | undefined;
     try {
       client = await this.database.pool.connect(); await client.query('BEGIN');
       // All settings, key, grant and approval paths share this database lock.
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [guildId]);
+      await client.query(`SELECT ${read ? 'pg_advisory_xact_lock_shared' : 'pg_advisory_xact_lock'}(hashtextextended($1,0))`, [guildId]);
       const result = await action(client); await client.query('COMMIT'); return result;
     } catch (error) {
       if (client) await client.query('ROLLBACK').catch(() => undefined);
@@ -44,7 +44,7 @@ export class SettingsService implements CredentialService {
     return this.transaction(guildId, async client => {
       const level = await this.access.require(actorId, guildId, action, accessRepository(client));
       return callback(client,level);
-    });
+    },action === 'read');
   }
   private async load(client: PoolClient, guildId: string): Promise<GuildSettings> {
     const row = (await client.query('SELECT * FROM guild_settings WHERE guild_id=$1', [guildId])).rows[0];
@@ -68,6 +68,9 @@ export class SettingsService implements CredentialService {
     return settings.providers.some(p => p.modelId !== null && BigInt(p.dailyAllowance) > 0n && this.modelSupport({ provider: p.provider, modelId: p.modelId, effort: p.effort, contextTokenLimit: settings.contextTokenLimit, maxGenerationTokens: settings.maxGenerationTokens }));
   }
   async getSettings(actorId: string, guildId: string): Promise<GuildSettings> { return this.protected(actorId, guildId, 'read', client => this.load(client, guildId)); }
+  async getSettingsWithAccess(actorId: string,guildId: string): Promise<{ settings: GuildSettings; level: AccessLevel }> {
+    return this.protected(actorId,guildId,'read',async (client,level) => ({ settings: await this.load(client,guildId),level }));
+  }
   async getUsageStatus(actorId: string,guildId: string,now: Date): Promise<UsageStatus> {
     if (!Number.isFinite(now.getTime())) throw new SettingsError('invalid_settings');
     return this.protected(actorId,guildId,'read',async client => {

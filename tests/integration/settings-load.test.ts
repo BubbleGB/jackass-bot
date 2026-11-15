@@ -16,35 +16,54 @@ describe('actual settings page HTTP load through Discord REST membership',() => 
   beforeAll(async () => { await admin.query(`CREATE DATABASE "${name}"`); url.pathname = `/${name}`; db = createDatabase(url.toString()); await migrate(db.db,{ migrationsFolder: './drizzle' }); });
   beforeEach(async () => { await db.pool.query('TRUNCATE daily_usage,usage_reservations,request_receipts,guild_settings,approved_guilds,web_sessions,oauth_states CASCADE'); });
   afterAll(async () => { await db?.close(); try { await admin.query(`DROP DATABASE IF EXISTS "${name}"`); } finally { await admin.end(); } });
-  it('performs four initial reads, five fresh lookups, then a separate grants lookup',async () => {
-    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('none');
+  it('bounds a healthy overlapping complete load to nine upstream requests without reusing settled membership',async () => {
+    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('slow');
       const results = await Promise.all(reads.map(p => f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })));
-      expect(results.map(r => r.statusCode)).toEqual([200,200,200,200]); expect(results[0]!.json().level).toBe('creator'); expect(f.discord.trace()).toEqual({ lookups: 5,discordReads: 21 });
-      expect((await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies })).statusCode).toBe(200); expect(f.discord.trace()).toEqual({ lookups: 6,discordReads: 25 });
+      expect(results.map(r => r.statusCode)).toEqual([200,200,200,200]);
+      expect((await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies })).statusCode).toBe(200);
+      expect(f.discord.trace().discordReads).toBe(9);
+      f.leave(); expect((await f.app.inject({ url: `/api/guilds/${guildId}/settings`,cookies })).statusCode).toBe(403);
     } finally { await f.app.close(); }
   });
-  it('returns retryable verification failure for concurrent rate limits despite successful individual reads',async () => {
+  it('repeated complete loads honour Discord bucket resets instead of amplifying rate-limit failures',async () => {
+    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('bucket');
+      for (let i = 0; i < 4; i++) {
+        const initial = await Promise.all(reads.map(p => f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })));
+        expect(initial.map(r => r.statusCode)).toEqual([200,200,200,200]);
+        expect((await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies })).statusCode).toBe(200);
+      }
+      expect(f.discord.trace().discordReads).toBeLessThanOrEqual(36);
+    } finally { await f.app.close(); }
+  });
+  it('performs four initial reads with one shared lookup, then verifies grants afresh',async () => {
+    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('slow');
+      const results = await Promise.all(reads.map(p => f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })));
+      expect(results.map(r => r.statusCode)).toEqual([200,200,200,200]); expect(results[0]!.json().level).toBe('creator'); expect(f.discord.trace()).toEqual({ lookups: 1,discordReads: 5 });
+      expect((await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies })).statusCode).toBe(200); expect(f.discord.trace()).toEqual({ lookups: 2,discordReads: 9 });
+    } finally { await f.app.close(); }
+  });
+  it('avoids the former concurrent burst and keeps individual reads fresh',async () => {
     const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('burst');
       const results = await Promise.all(reads.map(p => f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })));
-      expect(results.some(r => r.statusCode === 503 && r.json().error === 'verification_unavailable')).toBe(true);
+      expect(results.map(r => r.statusCode)).toEqual([200,200,200,200]);
       for (const p of [...reads,'grants']) expect((await f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })).statusCode).toBe(200);
     } finally { await f.app.close(); }
   });
-  it.each(['rate_limited','timeout','unavailable'] as const)('keeps later grants %s retryable after all initial reads return creator access',async mode => {
-    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault(mode,6);
+  it.each(['timeout','unavailable'] as const)('keeps later grants %s retryable after all initial reads return creator access',async mode => {
+    const f = await webFixture(db); try { const cookies = await login(f); f.discord.fault('slow');
       const results = await Promise.all(reads.map(p => f.app.inject({ url: `/api/guilds/${guildId}/${p}`,cookies })));
       expect(results.map(r => r.statusCode)).toEqual([200,200,200,200]); expect(results[0]!.json().level).toBe('creator');
-      const grants = await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies }); expect(grants.statusCode).toBe(503); expect(grants.json()).toEqual({ error: 'verification_unavailable' });
-      expect(f.diagnostics.at(-1)?.category).toBe('verification_'+(mode === 'rate_limited' ? 'rate_limited' : mode === 'timeout' ? 'timeout' : 'unavailable'));
+      f.discord.fault(mode); const grants = await f.app.inject({ url: `/api/guilds/${guildId}/grants`,cookies }); expect(grants.statusCode).toBe(503); expect(grants.json()).toEqual({ error: 'verification_unavailable' });
+      expect(f.diagnostics.at(-1)?.category).toBe('verification_'+(mode === 'timeout' ? 'timeout' : 'unavailable'));
     } finally { await f.app.close(); }
   });
   it('keeps temporary failure closed without mutating settings and emits only safe failure metadata',async () => {
     const f = await webFixture(db); try {
       const cookies = await login(f),session = await f.app.inject({ url: '/api/session',cookies }),current = await f.settings.getSettings(owner,guildId);
-      f.discord.fault('rate_limited',1);
+      f.discord.fault('unavailable',1);
       const r = await f.app.inject({ method: 'PATCH',url: `/api/guilds/${guildId}/settings?private=secret-query`,cookies,headers: { origin: 'http://127.0.0.1:4173','x-csrf-token': session.json().csrf },payload: { revision: current.revision,patch: { instructions: 'private staff text' } } });
       expect(r.statusCode).toBe(503); expect((await f.settings.getSettings(owner,guildId)).revision).toBe(current.revision);
-      expect(f.diagnostics).toHaveLength(1); expect(f.diagnostics[0]).toEqual({ route: '/api/guilds/:guildId/settings',status: 503,timingMs: expect.any(Number),category: 'verification_rate_limited' });
+      expect(f.diagnostics).toHaveLength(1); expect(f.diagnostics[0]).toEqual({ route: '/api/guilds/:guildId/settings',status: 503,timingMs: expect.any(Number),category: 'verification_unavailable' });
       expect(Object.keys(f.diagnostics[0]!).sort()).toEqual(['category','route','status','timingMs']);
       expect(JSON.stringify(f.diagnostics)).not.toMatch(/secret-query|private staff text|gn_session|synthetic-discord-token|222222222222222222/);
     } finally { await f.app.close(); }

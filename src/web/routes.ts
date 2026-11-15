@@ -7,7 +7,7 @@ const fields = (value: unknown,allowed: readonly string[]) => { const b = object
 export async function routes(app: FastifyInstance,d: WebDependencies,actor: (r: FastifyRequest) => Promise<string>) {
   const guild = (r: FastifyRequest) => (r.params as { guildId: string }).guildId;
   app.get('/api/servers',async r => d.directory.servers(await actor(r),(r.query as { after?: string }).after));
-  app.get('/api/guilds/:guildId/settings',async r => { const a = await actor(r),g = guild(r); const settings = await d.settings.getSettings(a,g),level = await d.access.require(a,g,'read'); return { settings,level,models: MODELS }; });
+  app.get('/api/guilds/:guildId/settings',async r => ({ ...await d.settings.getSettingsWithAccess(await actor(r),guild(r)),models: MODELS }));
   app.patch('/api/guilds/:guildId/settings',async r => { const b = fields(r.body,['revision','patch']); return { settings: await d.settings.updateSettings(await actor(r),guild(r),b.patch as SettingsPatch,b.revision as number) }; });
   app.get('/api/guilds/:guildId/channels',async r => ({ channels: await d.directory.channels(await actor(r),guild(r)) }));
   app.get('/api/guilds/:guildId/status',async r => d.settings.getUsageStatus(await actor(r),guild(r),(d.now ?? (() => new Date()))()));
