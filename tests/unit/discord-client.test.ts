@@ -6,6 +6,15 @@ import { registerCommands,readRegistrationConfig } from '../../src/discord/regis
 import type { DiscordCall } from '../../src/discord/transport.js';
 import { guild,channel,user,request } from '../helpers/conversation.js';
 describe('Discord gateway binding and explicit registration',() => {
+  it.each(['Global 🌌','',null,undefined])('normalises /ask globalName %s without using member nickname',async globalName => {
+    const emitter = new EventEmitter(),commands: unknown[] = [];
+    const gateway = createDiscordClient({ async handleMessage() {},async handleInteraction(i) { commands.push(i); } },() => ({ on: emitter.on.bind(emitter) as never,removeListener: emitter.removeListener.bind(emitter) as never,user: null,isReady: () => true,async login() { emitter.emit('clientReady'); return 'fake'; },async destroy() {} }));
+    await gateway.start('fake-token');
+    emitter.emit('interactionCreate',{ isChatInputCommand: () => true,id: request.id,applicationId: guild,token: 'fake-interaction',guildId: guild,channelId: channel,user: { id: user,globalName,username: 'fallback-user' },member: { nick: 'REST guild alias',nickname: 'SDK guild alias' },channel: { type: 0 },commandName: 'ask',options: { getString: () => 'Hi' } });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(commands).toEqual([expect.objectContaining({ userId: user,prompt: 'Hi',displayName: globalName || 'fallback-user' })]);
+    await gateway.stop();
+  });
   it('binds authenticated message/command identity with minimal intents and never registers on ready/reconnect',async () => {
     const emitter = new EventEmitter(),messages: unknown[] = [],commands: unknown[] = []; let options!: ClientOptions,logins = 0;
     const gateway = createDiscordClient({ async handleMessage(m) { messages.push(m); },async handleInteraction(i) { commands.push(i); } },o => { options = o; return { on: emitter.on.bind(emitter) as never,removeListener: emitter.removeListener.bind(emitter) as never,user: null,isReady: () => true,async login() { logins++; emitter.emit('clientReady'); return 'fake'; },async destroy() {} }; });

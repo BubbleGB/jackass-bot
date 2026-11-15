@@ -7,8 +7,8 @@ export function safeName(value: unknown): string | undefined {
   const name = prefix(value.replace(/[\p{Cc}\p{Bidi_Control}]/gu,'').trim(),nameLimits.characters); return name || undefined;
 }
 const record = (v: unknown): Record<string,unknown> => v && typeof v === 'object' ? v as Record<string,unknown> : {};
-export function discordName(member: unknown,author: unknown): string | undefined {
-  const m = record(member),u = record(author); return safeName(m.nick) ?? safeName(m.nickname) ?? safeName(u.global_name) ?? safeName(u.username);
+export function discordName(author: unknown): string | undefined {
+  const u = record(author); return safeName(u.global_name) ?? safeName(u.username);
 }
 /** Best-effort names only: no permissions are cached or inferred from these labels. */
 export async function nameContext(history: HistorySource,r: BotRequest,context: ContextMessage[],known: ReadonlySet<string>,parent: AbortSignal): Promise<ContextMessage[]> {

@@ -43,8 +43,8 @@ export class DiscordContextSource implements HistorySource {
       if (!isSnowflake(m.id) || m.channel_id !== r.channelId || (m.guild_id !== undefined && m.guild_id !== r.guildId) || !isSnowflake(author.id) || ![0,19,20].includes(Number(m.type)) || m.webhook_id !== undefined || author.system === true || typeof m.content !== 'string' || typeof m.timestamp !== 'string') return null;
       const timestamp = new Date(m.timestamp); if (!Number.isFinite(timestamp.getTime())) return null;
       const ref = m.message_reference ? record(m.message_reference) : {},referenced = m.referenced_message ? record(m.referenced_message) : {};
-      const displayName = discordName(m.member,author),serverNameKnown = !!m.member && typeof m.member === 'object' && 'nick' in m.member;
-      return { id: m.id,guildId: r.guildId,channelId: r.channelId,authorId: author.id,authorBot: author.bot === true,webhookId: null,content: m.content,timestamp,...(displayName ? { displayName,serverNameKnown } : {}),mentionsBot: Array.isArray(m.mentions) && m.mentions.some(v => record(v).id === this.botId),repliesToBot: m.type === 19 && ref.channel_id === r.channelId && (ref.guild_id === undefined || ref.guild_id === r.guildId) && !!referenced.author && record(referenced.author).id === this.botId };
+      const displayName = discordName(author);
+      return { id: m.id,guildId: r.guildId,channelId: r.channelId,authorId: author.id,authorBot: author.bot === true,webhookId: null,content: m.content,timestamp,...(displayName ? { displayName,authorNameKnown: true } : {}),mentionsBot: Array.isArray(m.mentions) && m.mentions.some(v => record(v).id === this.botId),repliesToBot: m.type === 19 && ref.channel_id === r.channelId && (ref.guild_id === undefined || ref.guild_id === r.guildId) && !!referenced.author && record(referenced.author).id === this.botId };
     } catch { return null; }
   }
   async fetchPage(r: BotRequest,before: string | undefined,limit: number,signal: AbortSignal): Promise<HistoryPage> {
@@ -66,7 +66,7 @@ export class DiscordContextSource implements HistorySource {
   }
   async resolveName(r: BotRequest,userId: string,signal: AbortSignal): Promise<string | undefined> {
     if (!validContextRequest(r) || !isSnowflake(userId) || signal.aborted) return undefined;
-    try { const member = record(await this.get(`/guilds/${r.guildId}/members/${userId}`,signal)),author = record(member.user); return author.id === userId ? discordName(member,author) : undefined; }
+    try { const member = record(await this.get(`/guilds/${r.guildId}/members/${userId}`,signal)),author = record(member.user); return author.id === userId ? discordName(author) : undefined; }
     catch { return undefined; }
   }
 }

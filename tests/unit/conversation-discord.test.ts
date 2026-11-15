@@ -16,12 +16,20 @@ function fixture() {
   return { data,paths,source,signal: new AbortController().signal };
 }
 describe('current Discord channel permissions and scoped history',() => {
-  it('preserves bounded guild display names with username fallback as untrusted metadata',async () => {
+  it('uses global user names for triggers, history and member fallback, ignoring guild nicknames',async () => {
     const f = fixture(),path = `/channels/${channel}/messages/${request.id}`;
     Object.assign(f.data[path]!,{ member: { nick: 'Nova 🌌' },author: { id: user,username: 'fallback-name',global_name: 'Global',bot: false } });
-    expect(await f.source.fetchTrigger(request,f.signal)).toMatchObject({ displayName: 'Nova 🌌',serverNameKnown: true });
-    Object.assign(f.data[path]!,{ member: { nick: null },author: { id: user,username: 'fallback-name',global_name: null,bot: false } });
-    expect(await f.source.fetchTrigger(request,f.signal)).toMatchObject({ displayName: 'fallback-name' });
+    expect(await f.source.fetchTrigger(request,f.signal)).toMatchObject({ displayName: 'Global',authorNameKnown: true });
+    f.data[`/channels/${channel}/messages?limit=100`] = [f.data[path]];
+    expect((await f.source.fetchPage(request,undefined,100,f.signal)).messages[0]).toMatchObject({ displayName: 'Global',authorNameKnown: true });
+    for (const global_name of [null,undefined,'',' \n ']) {
+      Object.assign(f.data[path]!,{ member: { nick: 'Still a guild alias' },author: { id: user,username: 'fallback-name',global_name,bot: false } });
+      expect(await f.source.fetchTrigger(request,f.signal)).toMatchObject({ displayName: 'fallback-name',authorNameKnown: true });
+      Object.assign(f.data[`/guilds/${guild}/members/${user}`]!,{ nick: 'Guild alias',user: { id: user,global_name,username: 'fallback-name' } });
+      expect(await f.source.resolveName(request,user,f.signal)).toBe('fallback-name');
+    }
+    Object.assign(f.data[`/guilds/${guild}/members/${user}`]!,{ nick: 'Guild alias',user: { id: user,global_name: 'Global',username: 'fallback-name' } });
+    expect(await f.source.resolveName(request,user,f.signal)).toBe('Global');
   });
   it('allows current human/bot members with all required channel permissions',async () => {
     const f = fixture(); expect(await f.source.canRead(request,f.signal)).toBe(true);

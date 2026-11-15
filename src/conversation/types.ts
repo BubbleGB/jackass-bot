@@ -7,7 +7,7 @@ export class ConversationError extends Error {
 export interface HistoryMessage {
   id: string; guildId: string; channelId: string; authorId: string; authorBot: boolean;
   webhookId: string | null; content: string; timestamp: Date; mentionsBot: boolean; repliesToBot: boolean;
-  displayName?: string; serverNameKnown?: boolean;
+  displayName?: string; authorNameKnown?: boolean;
 }
 export interface HistoryPage { messages: HistoryMessage[]; before: string | null }
 /** All operations use fresh channel/member permissions, without OAuth/gateway caches. */

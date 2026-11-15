@@ -27,7 +27,10 @@ knowledge deletion. Audit IDs/field names only, never bodies or excerpts. Dashbo
 includes large-text Android editing, counts/validation, explicit feedback, optimistic
 conflict recovery, draft preservation and provider-disclosure text.
 
-Include bounded server display names with participant IDs, username fallback, treating
+Owner name-selection amendment, 15 November 2026: use Discord global display names,
+falling back to username when blank or missing; never use server nicknames. This
+supersedes the original server-display-name selection everywhere names enter AI context.
+Include bounded global display names with participant IDs, username fallback, treating
 names as untrusted text. Names may be used naturally, not obligatorily. Resolve only
 bounded selected participants by message metadata/member ID, never an entire membership
 list or new privileged intent. Actual notifications remain limited to existing eligible

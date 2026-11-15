@@ -11,7 +11,7 @@ export function createDiscordClient(handlers: Pick<DiscordHandlers,'handleMessag
   });
   client.on(Events.InteractionCreate,interaction => {
     if (!interaction.isChatInputCommand()) return;
-    const displayName = discordName(interaction.member,{ global_name: interaction.user.globalName,username: interaction.user.username });
+    const displayName = discordName({ global_name: interaction.user.globalName,username: interaction.user.username });
     void handlers.handleInteraction({ id: interaction.id,applicationId: interaction.applicationId,token: interaction.token,...(interaction.guildId ? { guildId: interaction.guildId } : {}),channelId: interaction.channelId,userId: interaction.user.id,channelType: interaction.channel?.type ?? -1,command: interaction.commandName,...(displayName ? { displayName } : {}),...(interaction.commandName === 'ask' ? { prompt: interaction.options.getString('prompt') ?? '' } : {}) }).catch(() => undefined);
   });
   client.on(Events.GuildCreate,g => { if (g.available !== false) lifecycle.guildsChanged?.(); });

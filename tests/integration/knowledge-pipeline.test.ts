@@ -28,9 +28,9 @@ describe('knowledge and names through Discord, providers, ledger and delivery',(
       if (r.path === `/channels/${channel}`) { if (onReserved && (await db.pool.query("SELECT 1 FROM usage_reservations WHERE state='reserved' LIMIT 1")).rowCount) { const run = onReserved; onReserved = undefined; await run(); } return { id: channel,guild_id: guild,type: 0,permission_overwrites: [] }; }
       if (r.path === `/guilds/${guild}`) return { id: guild,owner_id: user };
       if (r.path.endsWith('/roles')) return [{ id: guild,permissions: '68608' }];
-      if (r.path.includes('/members/')) { const id = r.path.split('/').at(-1)!; return { nick: id === user ? hostileName : 'Neegy',user: { id,username: id === user ? 'fallback-user' : 'bot',bot: id === bot },roles: [] }; }
+      if (r.path.includes('/members/')) { const id = r.path.split('/').at(-1)!; return { nick: 'Guild alias must not enter AI',user: { id,global_name: id === user ? hostileName : 'Neegy',username: id === user ? 'fallback-user' : 'bot',bot: id === bot },roles: [] }; }
       if (r.path.includes('/messages?')) return [];
-      const id = r.path.split('/').at(-1)!; return { id,channel_id: channel,guild_id: guild,author: { id: user,username: 'fallback-user',bot: false },content: 'Tell me about selenite?',timestamp: new Date(time-1).toISOString(),type: 0,mentions: messages.get(id) ? [{ id: bot }] : [] };
+      const id = r.path.split('/').at(-1)!; return { id,channel_id: channel,guild_id: guild,author: { id: user,global_name: hostileName,username: 'fallback-user',bot: false },content: 'Tell me about selenite?',timestamp: new Date(time-1).toISOString(),type: 0,mentions: messages.get(id) ? [{ id: bot }] : [] };
     } };
     const http: HttpTransport = async r => {
       const counting = r.url.endsWith('/input_tokens') || r.url.endsWith(':countTokens');
@@ -55,7 +55,7 @@ describe('knowledge and names through Discord, providers, ledger and delivery',(
   it.each(['openai','google'] as const)('counts/reconciles references and hostile names for %s direct and automatic answers, observes live entry changes',async provider => {
     const f = await fixture(provider); try {
       await f.message(1,true); await f.message(2); expect(f.generations()).toBe(2);
-      for (const raw of f.payloads) { const input = JSON.parse(raw); expect(input.conversation.at(-1)).toMatchObject({ authorId: user,displayName: hostileName }); expect(input.staffReference.passages[0].text).toContain('Selenite is gypsum'); }
+      for (const raw of f.payloads) { const input = JSON.parse(raw); expect(input.conversation.at(-1)).toMatchObject({ authorId: user,displayName: hostileName }); expect(input.staffReference.passages[0].text).toContain('Selenite is gypsum'); expect(raw).not.toContain('Guild alias must not enter AI'); }
       expect(f.counts).toContain(f.payloads[0]);
       const reservations = (await db.pool.query('SELECT reserved,state FROM usage_reservations ORDER BY created_at')).rows;
       expect(reservations).toHaveLength(2); expect(reservations.every(r => r.state === 'known' && r.reserved === (provider === 'openai' ? '2208' : '2240'))).toBe(true);
