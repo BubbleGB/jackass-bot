@@ -52,6 +52,13 @@ direct and automatic orchestration pass the same fitted bundle to ProviderRouter
 Static application instructions label staff references/names as untrusted data.
 References are JSON-encoded user content under a distinct staff-reference envelope,
 with no system role, tool, permission or hidden conversation state.
+When references are present, the shared provider policy prioritises relevant local
+material over unrelated general knowledge for ambiguous names/server questions. Personal
+claims must be attributed to staff-supplied information, not independently verified facts;
+no personal acquaintance or unsupported details. Ask for clarification when the material
+does not establish an identity/fact, and omit irrelevant sensitive claims. This is answer
+grounding guidance, not system privileges for the passages. It is included in provider
+input counting/reservations and the marginal knowledge budget; allowances stay unchanged.
 
 Use each eligible provider's existing complete-input counter on the same full bundle
 and on its knowledge-free baseline. Incremental input (including reference framing)
