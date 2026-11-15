@@ -62,7 +62,14 @@ describe('shared knowledge/name context construction',() => {
     const a = payload('openai',input),b = payload('google',{ ...input,modelId: 'gemini-3.5-flash-lite',effort: 'low' });
     expect(a.context).toBe(b.context); expect(JSON.parse(a.context)).toMatchObject({ conversation: [{ displayName: context[0]!.displayName }],staffReference: { passages: knowledge } });
     expect(a.instruction).not.toContain(knowledge[0]!.text); expect(a.instruction).toContain('untrusted');
-    expect(a.instruction).toBe(b.instruction); expect(a.instruction).toContain('Attribute personal claims to staff-supplied information');
+    expect(a.instruction).toBe(b.instruction);
+    expect(a.instruction).toContain('Use the knowledge naturally and conversationally');
+    expect(a.instruction).toContain('Explain that the information comes from this server\'s knowledge entries when asked about its source');
+    expect(a.instruction).toContain('without claiming independent verification');
+    expect(a.instruction).toContain('Never claim personal acquaintance or add unsupported details');
+    expect(a.instruction).toContain('Preserve uncertainty stated in the references');
+    expect(a.instruction).toContain('acknowledge that specific gap or ask for clarification');
+    expect(a.instruction).not.toContain('Attribute personal claims to staff-supplied information');
     expect(payload('openai',{ ...input,knowledge: [] }).instruction).not.toContain('Prioritise relevant staff-supplied references');
   });
 });

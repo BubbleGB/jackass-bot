@@ -36,15 +36,21 @@ over unrelated general lore, attribute personal claims, or avoid personal-acquai
 claims/unsupported elaboration. Both provider regressions first failed on that missing
 request contract after confirming the entry already reached the generation API.
 
-The shared prompt now supplies those rules whenever references are present. References
+The original fix supplied those rules whenever references were present. A subsequent
+owner style amendment removes mandatory per-claim attribution and routine source,
+verification or personal-acquaintance disclaimers: use the knowledge conversationally,
+explain its source when asked, retain stated uncertainty and acknowledge specific gaps.
+Personal acquaintance, implied independent verification and unsupported additions remain
+forbidden. This changes presentation, not grounding or retrieval. References
 remain untrusted user data, cannot override application permissions/instructions, and
 cannot grant tools or notification recipients. Disabled/deleted/freshness checks,
 Unicode/context/knowledge limits, required input and accounting remain intact. The extra
 policy is counted in both providers' complete input and marginal knowledge estimates.
 
 The handler tests cover the exact mention form, `Shaggy?`, `Who is Shaggy?` and
-`Tell me about Shaggy.` with both providers. A mocked, attributed answer is delivered
-unchanged with existing allowed mentions; existing tests cover automatic participation
+`Tell me about Shaggy.` with both providers. A mocked natural answer is delivered
+unchanged with existing allowed mentions; explicit source and acquaintance questions
+also retain their honest explanations. Existing tests cover automatic participation
 and absence/disablement of knowledge. Mocked answers prove payload/delivery contracts,
 not that a live model will follow the instructions. They do not reproduce a model's
 internal choice to discuss Scooby-Doo. The live reply alone cannot prove that internal
@@ -56,7 +62,8 @@ missing answer-grounding policy, while lookup failure was not reproduced.
 Update the approved image digest; no new migration, dependency, Compose setting, secret,
 command registration, entry rewrite or index rebuild. Existing model/effort selections
 and allowances stay unchanged. After separately authorised rollout, repeat the original
-mention against the real provider and verify relevance, attribution and no invented
+mention against the real provider and verify relevance, natural wording, source honesty
+when asked and no invented
 details. No VPS deployment is performed by this change.
 
 Retrieval remains bounded lexical matching, not semantic identity resolution. In a

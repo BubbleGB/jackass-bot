@@ -53,10 +53,13 @@ Static application instructions label staff references/names as untrusted data.
 References are JSON-encoded user content under a distinct staff-reference envelope,
 with no system role, tool, permission or hidden conversation state.
 When references are present, the shared provider policy prioritises relevant local
-material over unrelated general knowledge for ambiguous names/server questions. Personal
-claims must be attributed to staff-supplied information, not independently verified facts;
-no personal acquaintance or unsupported details. Ask for clarification when the material
-does not establish an identity/fact, and omit irrelevant sensitive claims. This is answer
+material over unrelated general knowledge for ambiguous names/server questions. Owner
+style amendment, 15 November 2026: use the knowledge naturally, without routine source,
+verification or personal-acquaintance disclaimers. Explain its server-knowledge source
+when asked, without implying independent verification. This supersedes mandatory
+attribution on every personal claim. Preserve stated uncertainty, acknowledge specific
+missing/conflicting facts, and never claim personal acquaintance or add unsupported
+details. Omit irrelevant sensitive claims. This is answer
 grounding guidance, not system privileges for the passages. It is included in provider
 input counting/reservations and the marginal knowledge budget; allowances stay unchanged.
 
