@@ -1,7 +1,7 @@
 import type { BotRequest,ContextMessage,GenerationInput } from '../domain/types.js';
 import type { GuildSettings } from '../settings/service.js';
 import { bounds } from '../settings/validation.js';
-import { MODELS,supportsModel } from '../providers/catalog.js';
+import { MODELS,supportsModel,fitsModelTokens } from '../providers/catalog.js';
 import { ConversationError,contextOperation,conversationLimits,humanTrigger,validContextRequest,type AutomaticContextResult,type HistoryMessage,type HistorySource,type InputCounter } from './types.js';
 const order = (a: ContextMessage,b: ContextMessage) => a.timestamp.getTime()-b.timestamp.getTime() || (BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0);
 export class ContextBuilder {
@@ -71,7 +71,7 @@ export class ContextBuilder {
           counted = true;
           if (!Number.isSafeInteger(count) || count < 0) throw new ConversationError('context_unavailable');
           const m = MODELS.find(m => m.provider === p.provider && m.id === p.modelId)!;
-          if (count > settings.contextTokenLimit || count+settings.maxGenerationTokens > m.inputLimit) { fits = false; break; }
+          if (count > settings.contextTokenLimit || !fitsModelTokens(m,count,settings.maxGenerationTokens)) { fits = false; break; }
         }
         if (fits && !counted) throw new ConversationError('context_unavailable');
         if (fits) {

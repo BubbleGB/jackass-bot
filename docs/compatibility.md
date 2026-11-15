@@ -1,5 +1,8 @@
 # Task 1 compatibility evidence
 
+Latest model update: [GPT-6 Luna official contract checked 15 November 2026](openai-luna.md).
+The dated foundation and provider evidence below remains historical context.
+
 Checked 13 November 2026 in Codex Cloud. Exact direct dependency versions were recovered
 from the phone and retained after querying the official npm registry version endpoints.
 `npm ci --ignore-scripts`, `npm ls --depth=0` and the checks in
