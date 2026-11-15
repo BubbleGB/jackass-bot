@@ -1,6 +1,7 @@
 import type { DiscordGet } from '../access/discord-membership.js';
 import { isSnowflake } from '../access/policy.js';
 import type { BotRequest } from '../domain/types.js';
+import { discordName } from './names.js';
 import { ConversationError,contextOperation,validContextRequest,type HistoryMessage,type HistoryPage,type HistorySource } from './types.js';
 const record = (v: unknown): Record<string,unknown> => { if (!v || typeof v !== 'object' || Array.isArray(v)) throw new ConversationError('context_unavailable'); return v as Record<string,unknown>; };
 const bits = (v: unknown): bigint => { if (typeof v !== 'string' || !/^\d{1,30}$/.test(v)) throw new ConversationError('context_unavailable'); return BigInt(v); };
@@ -42,7 +43,8 @@ export class DiscordContextSource implements HistorySource {
       if (!isSnowflake(m.id) || m.channel_id !== r.channelId || (m.guild_id !== undefined && m.guild_id !== r.guildId) || !isSnowflake(author.id) || ![0,19,20].includes(Number(m.type)) || m.webhook_id !== undefined || author.system === true || typeof m.content !== 'string' || typeof m.timestamp !== 'string') return null;
       const timestamp = new Date(m.timestamp); if (!Number.isFinite(timestamp.getTime())) return null;
       const ref = m.message_reference ? record(m.message_reference) : {},referenced = m.referenced_message ? record(m.referenced_message) : {};
-      return { id: m.id,guildId: r.guildId,channelId: r.channelId,authorId: author.id,authorBot: author.bot === true,webhookId: null,content: m.content,timestamp,mentionsBot: Array.isArray(m.mentions) && m.mentions.some(v => record(v).id === this.botId),repliesToBot: m.type === 19 && ref.channel_id === r.channelId && (ref.guild_id === undefined || ref.guild_id === r.guildId) && !!referenced.author && record(referenced.author).id === this.botId };
+      const displayName = discordName(m.member,author),serverNameKnown = !!m.member && typeof m.member === 'object' && 'nick' in m.member;
+      return { id: m.id,guildId: r.guildId,channelId: r.channelId,authorId: author.id,authorBot: author.bot === true,webhookId: null,content: m.content,timestamp,...(displayName ? { displayName,serverNameKnown } : {}),mentionsBot: Array.isArray(m.mentions) && m.mentions.some(v => record(v).id === this.botId),repliesToBot: m.type === 19 && ref.channel_id === r.channelId && (ref.guild_id === undefined || ref.guild_id === r.guildId) && !!referenced.author && record(referenced.author).id === this.botId };
     } catch { return null; }
   }
   async fetchPage(r: BotRequest,before: string | undefined,limit: number,signal: AbortSignal): Promise<HistoryPage> {
@@ -61,5 +63,10 @@ export class DiscordContextSource implements HistorySource {
     if (!validContextRequest(r) || r.source === 'ask' || signal.aborted) return null;
     try { const m = this.message(await this.get(`/channels/${r.channelId}/messages/${r.id}`,signal),r); return m?.id === r.id && !m.authorBot ? m : null; }
     catch { throw new ConversationError('context_unavailable'); }
+  }
+  async resolveName(r: BotRequest,userId: string,signal: AbortSignal): Promise<string | undefined> {
+    if (!validContextRequest(r) || !isSnowflake(userId) || signal.aborted) return undefined;
+    try { const member = record(await this.get(`/guilds/${r.guildId}/members/${userId}`,signal)),author = record(member.user); return author.id === userId ? discordName(member,author) : undefined; }
+    catch { return undefined; }
   }
 }

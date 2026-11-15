@@ -8,7 +8,7 @@ export interface AccessRepository {
   grants(guildId: string): Promise<readonly AccessGrant[]>;
 }
 export class SettingsError extends Error {
-  constructor(public readonly code: 'forbidden' | 'invalid_settings' | 'revision_conflict' | 'not_configured' | 'storage_failed' | 'credential_invalid' | 'verification_unavailable',readonly reason?: VerificationReason) { super(code); this.name = 'SettingsError'; }
+  constructor(public readonly code: 'forbidden' | 'invalid_settings' | 'revision_conflict' | 'not_configured' | 'storage_failed' | 'credential_invalid' | 'verification_unavailable' | 'invalid_knowledge' | 'knowledge_limit' | 'knowledge_not_found',readonly reason?: VerificationReason) { super(code); this.name = 'SettingsError'; }
 }
 export const isSnowflake = (id: unknown): id is string => typeof id === 'string' && /^\d{17,20}$/.test(id);
 export function can(level: AccessLevel, action: AccessAction): boolean {

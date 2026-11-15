@@ -43,3 +43,15 @@ describe('complete provider count bridge without generation',() => {
     expect(await f.counter.countInput('google',{ ...f.input,modelId: 'gemini-3.5-flash-lite' },signal,scope)).toBe(152);
   });
 });
+
+describe('knowledge count submission freshness',() => {
+  const knowledge = [{ entryId: '11111111-1111-4111-8111-111111111111',revision: 1,chunkIndex: 0,title: 'Reference',text: 'Lunar facts.' }];
+  it('does not transmit reference text without a freshness checker',async () => {
+    const f = fixture(); await expect(f.counter.countInput('openai',{ ...f.input,knowledge },new AbortController().signal,{ guildId: guild,revision: 1 })).rejects.toMatchObject({ safeCode: 'configuration_changed' }); expect(f.calls).toEqual([]); expect(f.failures).toEqual([]);
+  });
+  it('rejects edits during counting after the estimate without changing provider health',async () => {
+    const f = fixture(); let active = true; f.adapters.get('openai')!.estimateUsage = async () => { active = false; return 2200; };
+    const counter = new ProviderInputCounter(f.repository,{ open() { return 'fake-key'; } },f.adapters,() => new Date(),{ async current() { return active; } });
+    await expect(counter.countInput('openai',{ ...f.input,knowledge },new AbortController().signal,{ guildId: guild,revision: 1 })).rejects.toMatchObject({ safeCode: 'configuration_changed' }); expect(f.failures).toEqual([]);
+  });
+});

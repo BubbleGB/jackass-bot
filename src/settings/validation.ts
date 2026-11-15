@@ -1,10 +1,11 @@
 import type { MembershipRepository } from '../access/discord-membership.js';
 import { SettingsError, isSnowflake } from '../access/policy.js';
 import type { ProviderId } from '../domain/types.js';
+import { knowledgeLimits } from '../knowledge/limits.js';
 export interface ProviderPatch { provider: ProviderId; modelId?: string | null; effort?: string | null; priority?: number; dailyAllowance?: string }
 export interface SettingsPatch {
   instructions?: string; enabled?: boolean; directEnabled?: boolean; humanContextLimit?: number; selfContextLimit?: number;
-  contextTokenLimit?: number; autoPolicy?: 'conditional' | 'always'; autoGapSeconds?: number; autoThreshold?: number;
+  contextTokenLimit?: number; knowledgeTokenLimit?: number; autoPolicy?: 'conditional' | 'always'; autoGapSeconds?: number; autoThreshold?: number;
   answerTargetTokens?: number; maxGenerationTokens?: number; autoChannels?: string[]; providers?: ProviderPatch[];
 }
 export interface ProviderSettings {
@@ -13,7 +14,7 @@ export interface ProviderSettings {
 }
 export interface GuildSettings {
   guildId: string; revision: number; instructions: string; enabled: boolean; directEnabled: boolean;
-  humanContextLimit: number; selfContextLimit: number; contextTokenLimit: number; autoPolicy: 'conditional' | 'always';
+  humanContextLimit: number; selfContextLimit: number; contextTokenLimit: number; knowledgeTokenLimit: number; autoPolicy: 'conditional' | 'always';
   autoGapSeconds: number; autoThreshold: number; answerTargetTokens: number; maxGenerationTokens: number;
   autoChannels: string[]; providers: ProviderSettings[];
 }
@@ -22,6 +23,7 @@ export interface ModelSelection { provider: ProviderId; modelId: string; effort:
 export type ModelSupport = (selection: ModelSelection) => boolean;
 export const bounds = {
   humanContextLimit: [0, 100], selfContextLimit: [0, 20], contextTokenLimit: [1, 32000],
+  knowledgeTokenLimit: [0,knowledgeLimits.maxTokens],
   autoGapSeconds: [5, 3600], autoThreshold: [1, 10000], answerTargetTokens: [1, 32000], maxGenerationTokens: [1, 32000],
 } as const;
 const bad = (): never => { throw new SettingsError('invalid_settings'); };

@@ -6,6 +6,12 @@ history can be sent to the server's configured OpenAI or Google provider. Provid
 apply their own retention policies; this application cannot promise zero provider
 retention. The bot cannot use AI output to operate tools, change settings or grant access.
 
+Bounded participant display names/IDs and selected staff knowledge passages (including
+their titles) are also sent in that counted request. Names/references remain untrusted
+data and do not grant tools or permissions. Local PostgreSQL full-text retrieval uses
+no embeddings, external search service or paid AI retrieval call. Token-count endpoints
+can receive candidate passages during fitting, even if some are trimmed before generation.
+
 Conversation text and generated answers are fetched/held briefly in memory, not stored
 in PostgreSQL or application logs. Discord retains messages under its own policies.
 The application stores server settings and staff-written personality instructions,
@@ -14,6 +20,14 @@ request identifiers, sanitised error codes and settings audit metadata. Provider
 are write-only in the dashboard; encryption uses the separate deployment key. Database
 or secret-store administrators with that key can decrypt them. The creator's management
 access requires current membership in the server; creator approval is a separate gate.
+
+The deliberate exception to ephemeral conversation is staff-authored knowledge: entry
+titles/bodies, enabled state, versions, timestamps and searchable chunks stay in
+PostgreSQL until staff delete them or the bot's confirmed guild removal cascades them.
+There is no automatic extraction of durable conversation memory or participant profile.
+Knowledge audits retain only actor/guild/entry IDs, actions and field names for 90 days,
+not bodies/excerpts. Knowledge is not encrypted like provider credentials; authorised
+dashboard staff and database administrators can read it. Do not store secrets in entries.
 
 Daily maintenance removes sanitised operational errors older than 7 days, audit events
 older than 90 days, and completed/failed request receipts and known/not-sent reservation
@@ -26,6 +40,9 @@ at startup and every 24 hours while the worker is healthy, so expiry is not imme
 Web sessions expire after 12 hours; one-use OAuth state expires after 10 minutes. Expired
 rows are removed by maintenance. Unsaved dashboard drafts live in the browser tab's
 session storage and clear when that tab's session ends or the user discards them.
+The Knowledge editor keeps its active entry/draft separately under the signed-in user
+and guild in the same tab storage, cleared on sign-out. If browser storage is blocked or
+full, it reports memory-only recovery limits; keep the tab open or copy/save the text.
 
 A complete successful Discord membership listing that confirms the bot has left a
 server deletes its settings, credentials, grants, channels and related live scheduling

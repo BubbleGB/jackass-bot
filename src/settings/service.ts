@@ -18,7 +18,7 @@ export function accessRepository(client: Pick<Pool, 'query'>): AccessRepository 
 }
 const fields = {
   instructions: 'instructions', enabled: 'enabled', directEnabled: 'direct_enabled', humanContextLimit: 'human_context_limit',
-  selfContextLimit: 'self_context_limit', contextTokenLimit: 'context_token_limit', autoPolicy: 'auto_policy',
+  selfContextLimit: 'self_context_limit', contextTokenLimit: 'context_token_limit', knowledgeTokenLimit: 'knowledge_token_limit', autoPolicy: 'auto_policy',
   autoGapSeconds: 'auto_gap_seconds', autoThreshold: 'auto_threshold', answerTargetTokens: 'answer_target_tokens', maxGenerationTokens: 'max_generation_tokens',
 } as const;
 /** Every public operation expects an authenticated actor ID from the backend,
@@ -52,7 +52,7 @@ export class SettingsService implements CredentialService {
     const providers = (await client.query('SELECT provider,model_id,effort,priority,daily_allowance FROM provider_configs WHERE guild_id=$1 ORDER BY priority', [guildId])).rows.map(p => ({ provider: p.provider as ProviderId, modelId: p.model_id as string | null, effort: p.effort as string | null, priority: p.priority as number, dailyAllowance: String(p.daily_allowance), credentialConfigured: true as const }));
     const autoChannels = (await client.query('SELECT channel_id FROM auto_channels WHERE guild_id=$1 ORDER BY channel_id', [guildId])).rows.map(r => r.channel_id as string);
     return { guildId, revision: row.revision, instructions: row.instructions, enabled: row.enabled, directEnabled: row.direct_enabled,
-      humanContextLimit: row.human_context_limit, selfContextLimit: row.self_context_limit, contextTokenLimit: row.context_token_limit,
+      humanContextLimit: row.human_context_limit, selfContextLimit: row.self_context_limit, contextTokenLimit: row.context_token_limit,knowledgeTokenLimit: row.knowledge_token_limit,
       autoPolicy: row.auto_policy, autoGapSeconds: row.auto_gap_seconds, autoThreshold: row.auto_threshold,
       answerTargetTokens: row.answer_target_tokens, maxGenerationTokens: row.max_generation_tokens, providers, autoChannels };
   }

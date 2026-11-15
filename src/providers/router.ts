@@ -7,6 +7,9 @@ import { isSnowflake } from '../access/policy.js';
 import { ProviderFailure } from './http.js';
 import type { ProviderAdapter } from './common.js';
 import type { ProviderRepository } from './store.js';
+import type { KnowledgeSource } from '../knowledge/types.js';
+import { knowledgeLimits } from '../knowledge/limits.js';
+import { requireCurrentReferences } from './references.js';
 async function bounded<T>(run: () => Promise<T>,signal: AbortSignal): Promise<T> {
   if (signal.aborted) throw new ProviderFailure('transient','cancelled_before_send',{ notSent: true });
   let abort!: () => void;
@@ -17,7 +20,7 @@ async function bounded<T>(run: () => Promise<T>,signal: AbortSignal): Promise<T>
 }
 export interface ProviderControls { signal?: AbortSignal; beforeSend?: () => Promise<void> }
 export class ProviderRouter {
-  constructor(private readonly repository: ProviderRepository,private readonly usage: Pick<UsageService,'reserveUsage' | 'settleUsage'>,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly repository: ProviderRepository,private readonly usage: Pick<UsageService,'reserveUsage' | 'settleUsage'>,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date(),private readonly references?: Pick<KnowledgeSource,'current'>) {}
   async generateWithFallback(request: BotRequest,input: GenerationInput,expectedRevision?: number,controls?: ProviderControls): Promise<GenerationResult> {
     if (!isSnowflake(request.guildId) || !/^[A-Za-z0-9_-]{1,128}$/.test(request.id)) throw new ProviderFailure('configuration','invalid_request',{ notSent: true });
     if (!await this.repository.claim(request.guildId,request.id)) throw new ProviderFailure('configuration','request_not_claimed',{ notSent: true });
@@ -53,7 +56,17 @@ export class ProviderRouter {
           try { credential = this.cipher.open(request.guildId,candidate.provider,candidate); } catch { throw new ProviderFailure('configuration','credential_invalid',{ notSent: true }); }
           const generation: GenerationInput = { ...immutable,instructions: config.instructions,mode: request.source === 'automatic' ? (config.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional') : 'direct',modelId: candidate.modelId,maxGenerationTokens: config.maxGenerationTokens };
           if (candidate.effort !== null) generation.effort = candidate.effort; else delete generation.effort;
+          const knowledgeBudget = config.knowledgeTokenLimit ?? knowledgeLimits.defaultTokens;
+          if (generation.knowledge?.length && knowledgeBudget === 0) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
+          await requireCurrentReferences(this.references,request.guildId,generation,signal);
           const estimate = await bounded(() => adapter.estimateUsage(generation,credential,signal),signal);
+          await requireCurrentReferences(this.references,request.guildId,generation,signal);
+          if (generation.knowledge?.length) {
+            const baseline = await bounded(() => adapter.estimateUsage({ ...generation,knowledge: [] },credential,signal),signal);
+            await requireCurrentReferences(this.references,request.guildId,generation,signal);
+            if (!Number.isSafeInteger(baseline) || baseline < generation.maxGenerationTokens || baseline > estimate) throw new ProviderFailure('uncertain','invalid_usage',{ notSent: true });
+            if (estimate-baseline > knowledgeBudget) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
+          }
           // Recheck the current full-input ceiling even if this provider was skipped
           // during context sizing and became eligible after backoff/funding recovery.
           if (!Number.isSafeInteger(estimate) || estimate < generation.maxGenerationTokens) throw new ProviderFailure('uncertain','invalid_usage',{ notSent: true });
@@ -64,6 +77,7 @@ export class ProviderRouter {
           phase = 'prepare';
           if (signal.aborted || !await this.repository.current(request.guildId,config,candidate)) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
           await checkpoint();
+          await requireCurrentReferences(this.references,request.guildId,generation,signal);
           generationStarted = true; anyGenerationStarted = true; phase = 'generate';
           const result = await bounded(() => adapter.generate(generation,credential,signal),signal);
           receivedResult = true; phase = 'bookkeeping';

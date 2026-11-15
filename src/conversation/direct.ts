@@ -23,7 +23,7 @@ export class DirectService {
   private async generate(r: BotRequest,controls?: ProviderControls): Promise<DirectOutcome> {
       const settings = await contextOperation(() => this.config.load(r.guildId),controls?.signal);
       if (!settings || !settings.enabled || !settings.directEnabled) throw new ConversationError('configuration_changed');
-      const context = await this.context.buildContext(r,settings,controls?.signal);
+      const bundle = await this.context.buildBundle(r,settings,controls?.signal),context = bundle.context;
       const current = await contextOperation(async signal => {
         const [config,canRead] = await Promise.all([this.config.load(r.guildId),this.history.canRead(r,signal)]);
         return config?.guildId === r.guildId && config.enabled && config.directEnabled && config.revision === settings.revision && canRead;
@@ -31,7 +31,7 @@ export class DirectService {
       if (!current) throw new ConversationError('configuration_changed');
       const p = settings.providers.find(p => p.modelId !== null && /^[1-9]\d*$/.test(p.dailyAllowance));
       if (!p) throw new ConversationError('context_limit');
-      const input: GenerationInput = { instructions: settings.instructions,context,mode: 'direct',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
+      const input: GenerationInput = { instructions: settings.instructions,context,...(bundle.knowledge.length ? { knowledge: bundle.knowledge } : {}),mode: 'direct',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
       return { status: 'accepted',result: await this.provider.generateWithFallback(r,input,settings.revision,controls),participantIds: [...new Set(context.filter(c => c.kind === 'human').map(c => c.authorId))] };
   }
 }

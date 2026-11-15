@@ -6,3 +6,8 @@
 /* Discord names can be long, unbroken strings. Keep every text child within its card. */
 .server-card>div{min-width:0;overflow-wrap:anywhere}.check{overflow-wrap:anywhere}
 .editor-fields{border:0;padding:0;margin:0;min-width:0}p,h1,h2,h3,small,li{overflow-wrap:anywhere}
+
+.knowledge-layout{display:grid;grid-template-columns:minmax(240px,310px) minmax(0,1fr);gap:24px;align-items:start}.knowledge-list,.knowledge-editor{min-width:0}.knowledge-list{padding:22px}.knowledge-list .section-title{align-items:flex-start;flex-wrap:wrap}.knowledge-list ul{list-style:none;padding:0;margin:1rem 0}.knowledge-list li{margin-bottom:.65rem}.knowledge-list li button{width:100%;text-align:left;align-items:stretch;flex-direction:column;background:#100d25;overflow-wrap:anywhere}.knowledge-list li button[aria-current=true]{border-color:var(--gold);background:#352246}.knowledge-list li button small{font-weight:400}.knowledge-editor input,.knowledge-editor textarea{font-size:16px}.knowledge-editor textarea{min-height:420px;resize:vertical}.knowledge-editor details pre{max-height:300px;overflow:auto;padding:.75rem;background:#100d25;border-radius:8px}.knowledge-page .tip{margin-top:0;margin-bottom:24px}.knowledge-editor>.panel{min-height:180px}
+@media(max-width:760px){.knowledge-layout{grid-template-columns:1fr;gap:18px}.knowledge-list{padding:18px}.knowledge-list ul{max-height:270px;overflow:auto}.knowledge-editor textarea{min-height:460px}.knowledge-editor .save-actions{flex-wrap:wrap}.knowledge-editor .save-actions button{min-width:110px}}
+/* Keep editor actions in the page flow so they never cover pasted text or conflict choices. */
+.knowledge-editor .save-bar{position:static}

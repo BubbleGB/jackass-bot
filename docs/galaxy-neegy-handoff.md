@@ -2,6 +2,44 @@
 
 Date: 13 November 2026. Owner: BubbleGB. Repository: https://github.com/BubbleGB/jackass-bot
 
+## Authorised additions — 15 November 2026: knowledge and participant names
+
+The owner authorised a guild-owned text knowledge base and natural participant names.
+These additions supersede the original exclusion of durable memory **only for explicit
+staff-authored knowledge entries**; conversation history and participant profiles remain
+ephemeral. The detailed binding design and limits are in [knowledge-names.md](knowledge-names.md).
+
+All currently authorised dashboard users, including delegates, may create/edit/enable/
+disable/delete named entries under the existing fresh membership/approval/access rules.
+Limits are centrally defined: title 120 Unicode characters; body 100,000 per entry;
+50 entries and 1,000,000 total body characters per guild. PostgreSQL stores ownership,
+timestamps, enabled state and entry revision plus searchable chunks. Local full-text
+retrieval uses current/recent human text; no embeddings, additional service or paid AI
+retrieval. Nonmatching knowledge is omitted. Retrieved knowledge defaults to 2,000 tokens,
+configurable 0–8,000 and always sharing the existing overall input ceiling. Required
+instructions/current questions remain intact; deterministic optional trimming must be
+Unicode-safe. Both providers count and reserve the actual knowledge/name payload.
+
+Knowledge remains delimited untrusted user/reference data, never system instructions,
+tools or an application permission grant. Recheck enabled/version/deleted state before
+provider use; edits affect subsequent requests without restart. Guild removal cascades
+knowledge deletion. Audit IDs/field names only, never bodies or excerpts. Dashboard
+includes large-text Android editing, counts/validation, explicit feedback, optimistic
+conflict recovery, draft preservation and provider-disclosure text.
+
+Include bounded server display names with participant IDs, username fallback, treating
+names as untrusted text. Names may be used naturally, not obligatorily. Resolve only
+bounded selected participants by message metadata/member ID, never an entire membership
+list or new privileged intent. Actual notifications remain limited to existing eligible
+participant IDs and the existing cap, with role/mass/fabricated notifications blocked.
+
+Implementation is authorised in Cloud on a new feature branch with mocks, isolated
+PostgreSQL, migration/index review, browser screenshots and AMD64/native ARM64 CI. Open
+a PR and stop unmerged. No paid calls, production credentials, registry publication,
+VPS access or deployment is authorised by this addition. Historical task stop points
+below do not restrict this explicitly authorised work; accounting/required-input/access/
+queue/privacy guarantees remain binding.
+
 ## User amendment — 13 November 2026 (supersedes earlier accounting requirement)
 
 Daily token allowances are practical usage safeguards, not guaranteed hard billing caps.

@@ -6,7 +6,7 @@ export const opaque = () => randomBytes(32).toString('base64url');
 export const validOpaque = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9_-]{43}$/.test(s);
 export function returnPath(path: unknown): string {
   if (path === undefined) return '/servers';
-  if (typeof path !== 'string' || !/^\/servers(?:\/\d{17,20})?$/.test(path)) throw new Error('invalid_return_path'); return path;
+  if (typeof path !== 'string' || !/^\/servers(?:\/\d{17,20}(?:\/knowledge)?)?$/.test(path)) throw new Error('invalid_return_path'); return path;
 }
 export class WebAuth {
   constructor(private readonly db: Database,private readonly secret: Buffer,private readonly now: () => Date) { if (secret.length !== 32) throw new Error('web_configuration'); }

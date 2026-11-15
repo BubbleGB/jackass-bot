@@ -186,6 +186,27 @@ Collect only the existing route/status/timingMs/category diagnostic records. The
 requires no new secrets, database migration or Compose setting. Permission lookups are
 shared only while pending; a later operation verifies current membership again.
 
+## Knowledge and participant-name rollout
+
+This update requires explicit migration `0008_knowledge_references.sql` before the new
+image starts. Stop the old app using the project-scoped procedure, take and verify a
+pre-migration backup, run the new image's migrator, then start that same approved image.
+The migration adds empty entry/chunk tables with full-text indexes, an audit target UUID
+and a default 2,000-token knowledge setting. It preserves existing model/effort choices,
+keys, allowances and input ceilings; the effective knowledge budget is also bounded by
+the existing overall input ceiling. No new secret, Compose setting, dependency, privileged
+Discord intent or command-registration change is required.
+
+The old image's strict schema-head check rejects the upgraded database. A previous-image
+restart alone is therefore not a rollback: prepare a matching-schema recovery image or
+test restoration of the pre-migration backup in an isolated project before rollout.
+Never clear migration/accounting state. Include staff knowledge and its search chunks
+in encrypted off-VPS backups and retention/removal checks; they are stored as plain text
+inside PostgreSQL. See [knowledge design and measured index costs](knowledge-names.md).
+Check large-entry creation, draft/conflict recovery and Save feedback on a physical
+Android device after separately authorised deployment. Verify actual Discord nicknames
+and safe mentions then; mocked CI does not claim these live checks.
+
 ## Reproduce image verification without external credentials
 
 ```sh

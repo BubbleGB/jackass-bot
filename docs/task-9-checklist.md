@@ -57,6 +57,12 @@ Galaxy Neegy logo is already bundled; no further artwork input is required.
 - On a physical Android phone, inspect landing/server/editor/privacy at normal and large
   text sizes: navigation, keyboard, scrolling, Save reachability, errors, conflict recovery
   and confirmation. CI's 390px Chromium viewport is not a physical-device result.
+- For the knowledge/name update, explicitly apply migration `0008_knowledge_references`
+  only with a verified pre-migration backup and schema-compatible recovery plan. Test
+  large knowledge paste/edit/save, separate tab draft and conflict recovery on Android;
+  verify relevant direct/automatic retrieval and real Discord server display names.
+  Confirm entry deletion/removal and backup expiry without exposing reference text in
+  diagnostics. The old image refuses the new schema head; see the runbook.
 - Verify TLS/certificates, Traefik-to-app routing on `aio_network` with no host ports,
   private database, secret file access,
   read-only/non-root app, Watchtower exclusions, readiness and graceful stop on the actual
