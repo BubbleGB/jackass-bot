@@ -62,6 +62,8 @@ describe('shared knowledge/name context construction',() => {
     const a = payload('openai',input),b = payload('google',{ ...input,modelId: 'gemini-3.5-flash-lite',effort: 'low' });
     expect(a.context).toBe(b.context); expect(JSON.parse(a.context)).toMatchObject({ conversation: [{ displayName: context[0]!.displayName }],staffReference: { passages: knowledge } });
     expect(a.instruction).not.toContain(knowledge[0]!.text); expect(a.instruction).toContain('untrusted');
+    expect(a.instruction).toBe(b.instruction); expect(a.instruction).toContain('Attribute personal claims to staff-supplied information');
+    expect(payload('openai',{ ...input,knowledge: [] }).instruction).not.toContain('Prioritise relevant staff-supplied references');
   });
 });
 function historyBot() { return '444444444444444444'; }
