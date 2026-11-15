@@ -1,12 +1,13 @@
+import type { KnowledgePassage } from '../knowledge/types.js';
 export type ProviderId = 'openai' | 'google';
 export type AccessLevel = 'none' | 'delegate' | 'admin' | 'creator';
 export type RequestSource = 'mention' | 'reply' | 'ask' | 'automatic';
 export interface BotRequest {
   id: string; guildId: string; channelId: string; userId: string;
-  source: RequestSource; prompt?: string; receivedAt: Date;
+  source: RequestSource; prompt?: string; displayName?: string; receivedAt: Date;
 }
 export interface ContextMessage {
-  id: string; authorId: string; kind: 'human' | 'self'; text: string; timestamp: Date;
+  id: string; authorId: string; kind: 'human' | 'self'; text: string; timestamp: Date; displayName?: string;
 }
 /** Reasoning is a breakdown; totalTokens must not count it twice. */
 export interface NormalizedUsage {
@@ -22,7 +23,7 @@ export interface ProviderError {
   retryAfterMs?: number; usage?: NormalizedUsage; safeCode: string;
 }
 export interface GenerationInput {
-  instructions: string; context: ContextMessage[];
+  instructions: string; context: ContextMessage[]; knowledge?: KnowledgePassage[];
   mode: 'direct' | 'auto_always' | 'auto_conditional'; modelId: string;
   effort?: string; maxGenerationTokens: number;
 }

@@ -1,6 +1,7 @@
 import { Client,Events,GatewayIntentBits,Options,type ClientOptions } from 'discord.js';
 import type { DiscordHandlers } from './events.js';
 import { DiscordFailure,discordBounded } from './transport.js';
+import { discordName } from '../conversation/names.js';
 export type RawGateway = Pick<Client,'on' | 'removeListener' | 'login' | 'destroy'> & { isReady(): boolean; readonly user: { id: string } | null };
 /** Gateway normalization only. No SDK send/reply helpers or reconnect registration. */
 export function createDiscordClient(handlers: Pick<DiscordHandlers,'handleMessage' | 'handleInteraction'>,factory: (options: ClientOptions) => RawGateway = options => new Client(options),lifecycle: { guildsChanged?: () => void } = {}) {
@@ -10,7 +11,8 @@ export function createDiscordClient(handlers: Pick<DiscordHandlers,'handleMessag
   });
   client.on(Events.InteractionCreate,interaction => {
     if (!interaction.isChatInputCommand()) return;
-    void handlers.handleInteraction({ id: interaction.id,applicationId: interaction.applicationId,token: interaction.token,...(interaction.guildId ? { guildId: interaction.guildId } : {}),channelId: interaction.channelId,userId: interaction.user.id,channelType: interaction.channel?.type ?? -1,command: interaction.commandName,...(interaction.commandName === 'ask' ? { prompt: interaction.options.getString('prompt') ?? '' } : {}) }).catch(() => undefined);
+    const displayName = discordName(interaction.member,{ global_name: interaction.user.globalName,username: interaction.user.username });
+    void handlers.handleInteraction({ id: interaction.id,applicationId: interaction.applicationId,token: interaction.token,...(interaction.guildId ? { guildId: interaction.guildId } : {}),channelId: interaction.channelId,userId: interaction.user.id,channelType: interaction.channel?.type ?? -1,command: interaction.commandName,...(displayName ? { displayName } : {}),...(interaction.commandName === 'ask' ? { prompt: interaction.options.getString('prompt') ?? '' } : {}) }).catch(() => undefined);
   });
   client.on(Events.GuildCreate,g => { if (g.available !== false) lifecycle.guildsChanged?.(); });
   client.on(Events.GuildDelete,g => { if (g.available !== false) lifecycle.guildsChanged?.(); });

@@ -24,7 +24,7 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   if (d.contactUrl !== undefined && !validContactUrl(d.contactUrl)) throw new Error('web_configuration');
   const app = Fastify({ logger: false,bodyLimit: 32768,trustProxy: false,requestTimeout: 15000 });
   const failureCategories = new WeakMap<FastifyRequest,string>();
-  const diagnosticRoutes = new Set(['settings','channels','status','errors','grants','providers/:provider/key'].map(p => '/api/guilds/:guildId/'+p));
+  const diagnosticRoutes = new Set(['settings','channels','status','errors','grants','providers/:provider/key','knowledge','knowledge/:entryId'].map(p => '/api/guilds/:guildId/'+p));
   app.addHook('onResponse',async (r,reply) => {
     const route = r.routeOptions.url;
     if (reply.statusCode < 400 || !route || !diagnosticRoutes.has(route)) return;
@@ -36,9 +36,9 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   await app.register(cookie); await app.register(rateLimit,{ global: true,max: 300,timeWindow: '1 minute',allowList: r => !r.url.startsWith('/api/') && !r.url.startsWith('/auth/') });
   app.addHook('onRequest',async (_r,reply) => { reply.header('cache-control','no-store').header('referrer-policy','no-referrer').header('x-content-type-options','nosniff').header('x-frame-options','DENY').header('content-security-policy',"default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"); });
   app.setErrorHandler((e,r,reply) => {
-    const code = e instanceof SettingsError ? e.code : (e as { statusCode?: number }).statusCode === 429 ? 'rate_limited' : 'request_failed';
+    const code = e instanceof SettingsError ? e.code : (e as { statusCode?: number }).statusCode === 429 ? 'rate_limited' : (e as { statusCode?: number }).statusCode === 413 ? 'request_too_large' : 'request_failed';
     failureCategories.set(r,e instanceof SettingsError && code === 'verification_unavailable' ? 'verification_'+(e.reason ?? 'unavailable') : code);
-    reply.status(code === 'forbidden' ? 403 : code === 'revision_conflict' ? 409 : code === 'rate_limited' ? 429 : ['storage_failed','verification_unavailable'].includes(code) ? 503 : 400).send({ error: code });
+    reply.status(code === 'forbidden' ? 403 : code === 'knowledge_not_found' ? 404 : code === 'revision_conflict' ? 409 : code === 'request_too_large' ? 413 : code === 'rate_limited' ? 429 : ['storage_failed','verification_unavailable'].includes(code) ? 503 : 400).send({ error: code });
   });
   const identity = async (r: FastifyRequest): Promise<WebIdentity | null> => { const token = r.cookies[sessionName]; const actor = await auth.identify(token); return actor && token ? { actor,token } : null; };
   app.get('/auth/discord',{ config: { rateLimit: { max: 20,timeWindow: '10 minutes' } } },async (r,reply) => {
@@ -63,7 +63,7 @@ export async function createWebServer(d: WebDependencies): Promise<FastifyInstan
   await routes(app,d,async r => (await identity(r))!.actor);
   if (d.assets) {
     await app.register(staticFiles,{ root: resolve(d.assets),prefix: '/',index: false });
-    for (const path of ['/','/privacy','/servers','/servers/:guildId','/creator']) app.get(path,(_r,reply) => reply.sendFile('index.html'));
+    for (const path of ['/','/privacy','/servers','/servers/:guildId','/servers/:guildId/knowledge','/creator']) app.get(path,(_r,reply) => reply.sendFile('index.html'));
   }
   return app;
 }

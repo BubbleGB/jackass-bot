@@ -7,7 +7,7 @@ import { DiscordDelivery,type InteractionTarget,type DeliveryReport } from './de
 import { discordBounded,noMentions,type DiscordTransport } from './transport.js';
 import { COMMANDS,HELP,type UsageStatus } from './commands.js';
 export interface DiscordMessageEvent { id: string; guildId: string | null; channelId: string; channelType: number; userId: string; bot: boolean; webhookId: string | null }
-export interface DiscordInteraction { id: string; applicationId: string; token: string; guildId?: string; channelId: string; userId: string; channelType: number; command: string; prompt?: string }
+export interface DiscordInteraction { id: string; applicationId: string; token: string; guildId?: string; channelId: string; userId: string; channelType: number; command: string; prompt?: string; displayName?: string }
 interface Dependencies {
   transport: DiscordTransport; worker: Pick<AutomaticService,'observeMessage' | 'submitDirect'>; access: Pick<AccessPolicy,'require'>;
   status: { getUsageStatus(actorId: string,guildId: string,now: Date): Promise<UsageStatus> }; publicOrigin: string;
@@ -98,7 +98,7 @@ export class DiscordHandlers {
       await discordBounded(() => this.deps.transport.call({ method: 'POST',path: `/interactions/${i.id}/${encodeURIComponent(i.token)}/callback`,body: { type: 5,data: { flags: publicDefer ? 0 : 64 } },signal }),signal);
     } catch { return; } // Unknown acknowledgement: never begin paid work or ack again blindly.
     if (!supported) { try { await this.edit(i,'Use commands in an ordinary server text channel.'); } catch { /* Safe no-op. */ } return; }
-    const r: BotRequest = { id: i.id,guildId: i.guildId!,channelId: i.channelId,userId: i.userId,source: 'ask',prompt: i.prompt ?? i.command,receivedAt: this.now() };
+    const r: BotRequest = { id: i.id,guildId: i.guildId!,channelId: i.channelId,userId: i.userId,source: 'ask',prompt: i.prompt ?? i.command,...(i.displayName ? { displayName: i.displayName } : {}),receivedAt: this.now() };
     let resolved = false;
     try {
       if (i.command === 'help') { await this.edit(i,`${HELP}\n${this.deps.publicOrigin}`); return; }

@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { bigint, boolean, check, customType, date, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { knowledgeLimits } from '../knowledge/limits.js';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
+const tsvector = customType<{ data: string }>({ dataType: () => 'tsvector' });
 const time = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 const createdAt = () => time('created_at').defaultNow().notNull();
 const guildId = () => text('guild_id').notNull().references(() => guildSettings.guildId, { onDelete: 'cascade' });
@@ -17,6 +19,7 @@ export const guildSettings = pgTable('guild_settings', {
   enabled: boolean('enabled').default(false).notNull(), directEnabled: boolean('direct_enabled').default(false).notNull(),
   humanContextLimit: integer('human_context_limit').default(30).notNull(), selfContextLimit: integer('self_context_limit').default(5).notNull(),
   contextTokenLimit: integer('context_token_limit').default(8000).notNull(), autoPolicy: text('auto_policy', { enum: ['conditional', 'always'] }).default('conditional').notNull(),
+  knowledgeTokenLimit: integer('knowledge_token_limit').default(knowledgeLimits.defaultTokens).notNull(),
   autoGapSeconds: integer('auto_gap_seconds').default(60).notNull(), autoThreshold: integer('auto_threshold').default(30).notNull(),
   answerTargetTokens: integer('answer_target_tokens').default(400).notNull(), maxGenerationTokens: integer('max_generation_tokens').default(2048).notNull(),
   revision: integer('revision').default(1).notNull(), createdAt: createdAt(), updatedAt: time('updated_at').defaultNow().notNull(),
@@ -24,7 +27,17 @@ export const guildSettings = pgTable('guild_settings', {
   check('guild_settings_snowflake', sql`${t.guildId} ~ '^[0-9]{17,20}$'`),
   check('guild_settings_bounds', sql`length(${t.instructions}) <= 8000 AND ${t.humanContextLimit} BETWEEN 0 AND 100 AND ${t.selfContextLimit} BETWEEN 0 AND 20 AND ${t.contextTokenLimit} BETWEEN 1 AND 32000 AND ${t.autoGapSeconds} BETWEEN 5 AND 3600 AND ${t.autoThreshold} BETWEEN 1 AND 10000 AND ${t.revision} > 0 AND ${t.answerTargetTokens} > 0 AND ${t.maxGenerationTokens} >= ${t.answerTargetTokens}`),
   check('guild_settings_policy', sql`${t.autoPolicy} IN ('conditional','always')`),
+  check('knowledge_token_bounds',sql`${t.knowledgeTokenLimit} BETWEEN 0 AND ${sql.raw(String(knowledgeLimits.maxTokens))}`),
 ]);
+export const knowledgeEntries = pgTable('knowledge_entries',{
+  guildId: guildId(),id: uuid('id').defaultRandom().notNull(),title: text('title').notNull(),body: text('body').notNull(),
+  bodyCharacters: integer('body_characters').generatedAlwaysAs(sql`char_length("body")`).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),revision: integer('revision').default(1).notNull(),createdAt: createdAt(),updatedAt: time('updated_at').defaultNow().notNull(),
+},t => [primaryKey({ columns: [t.guildId,t.id] }),check('knowledge_entry_bounds',sql`char_length(${t.title}) BETWEEN 1 AND ${sql.raw(String(knowledgeLimits.titleCharacters))} AND ${t.bodyCharacters} BETWEEN 1 AND ${sql.raw(String(knowledgeLimits.bodyCharacters))} AND ${t.revision} > 0`)]);
+export const knowledgeChunks = pgTable('knowledge_chunks',{
+  guildId: guildId(),entryId: uuid('entry_id').notNull(),ordinal: integer('ordinal').notNull(),title: text('title').notNull(),body: text('body').notNull(),
+  search: tsvector('search').generatedAlwaysAs(sql`setweight(to_tsvector('simple',normalize("title",NFKC)),'A') || setweight(to_tsvector('simple',normalize("body",NFKC)),'B')`).notNull(),
+},t => [primaryKey({ columns: [t.guildId,t.entryId,t.ordinal] }),foreignKey({ columns: [t.guildId,t.entryId],foreignColumns: [knowledgeEntries.guildId,knowledgeEntries.id] }).onDelete('cascade'),check('knowledge_chunk_ordinal',sql`${t.ordinal} >= 0`),index('knowledge_search_idx').using('gin',t.search)]);
 export const providerConfigs = pgTable('provider_configs', {
   guildId: guildId(), provider: provider(), ciphertext: bytea('ciphertext').notNull(), nonce: bytea('nonce').notNull(),
   keyVersion: integer('key_version').notNull(), modelId: text('model_id'), effort: text('effort'),
@@ -89,6 +102,7 @@ export const webSessions = pgTable('web_sessions', {
 export const auditEvents = pgTable('audit_events', {
   id: uuid('id').defaultRandom().primaryKey(), guildId: text('guild_id').references(() => guildSettings.guildId, { onDelete: 'cascade' }),
   targetGuildId: text('target_guild_id'),
+  targetEntryId: uuid('target_entry_id'),
   actor: text('actor').notNull(), action: text('action').notNull(), changedFields: text('changed_fields').array().notNull().default(sql`ARRAY[]::text[]`), createdAt: createdAt(),
 }, (t) => [check('audit_target_snowflake', sql`${t.targetGuildId} IS NULL OR ${t.targetGuildId} ~ '^[0-9]{17,20}$'`), index('audit_guild_created').on(t.guildId,t.createdAt)]);
 export const operationalErrors = pgTable('operational_errors', {

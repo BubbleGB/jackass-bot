@@ -6,6 +6,12 @@ safeguards. Development and testing use Codex Cloud; the Oracle ARM64 VPS remain
 future deployment target. Tasks 1–8 are merged. Task 9 deployment preparation
 is repository-only; production deployment and publication require separate authorisation.
 
+Authorised staff can maintain a per-server [text knowledge base](docs/knowledge-names.md).
+Local PostgreSQL search selects bounded reference passages; both providers count those
+passages and ephemeral participant names in the normal input/usage safeguards. The
+Knowledge dashboard supports large Android pastes, drafts and entry conflicts. Entries
+are deliberate staff content, not automatically saved conversation memory.
+
 `APP_MODE=foundation` validates configuration and exits without services. `APP_MODE=runtime`
 starts the Discord gateway, Fastify dashboard/API, database-backed single worker, health
 checks and daily maintenance. Runtime configuration requires credentials; do not enable it

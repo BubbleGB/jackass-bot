@@ -106,3 +106,21 @@ describe('bounded provider orchestration', () => {
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe('knowledge freshness at provider submission boundaries',() => {
+  const knowledge = [{ entryId: '11111111-1111-4111-8111-111111111111',revision: 1,chunkIndex: 0,title: 'Reference',text: 'Private lunar facts.' }];
+  it('fails closed before provider use when no knowledge checker is injected',async () => {
+    const f = fixture(); await expect(f.router().generateWithFallback(request,{ ...input,knowledge })).rejects.toMatchObject({ safeCode: 'configuration_changed' }); expect(f.calls).toEqual([]); expect(f.failures).toEqual([]);
+  });
+  it('rechecks after final beforeSend and releases the reservation without calling/falling back or blocking provider health',async () => {
+    const f = fixture(); let active = true,checkpoints = 0;
+    const router = new ProviderRouter(f.repository,f.usage,{ open() { return 'fake-key'; } },f.adapters,() => new Date(),{ async current() { return active; } });
+    await expect(router.generateWithFallback(request,{ ...input,knowledge },1,{ async beforeSend() { if (++checkpoints === 2) active = false; } })).rejects.toMatchObject({ safeCode: 'configuration_changed' });
+    expect(f.calls).toEqual([]); expect(f.settlements).toEqual(['openai:not_sent']); expect(f.failures).toEqual([]);
+  });
+  it('independently rejects knowledge when the current budget is zero without reserving or generating',async () => {
+    const f = fixture(); Object.assign(f.config,{ knowledgeTokenLimit: 0 }); f.config.candidates.splice(1);
+    const router = new ProviderRouter(f.repository,f.usage,{ open() { return 'fake-key'; } },f.adapters,() => new Date(),{ async current() { return true; } });
+    await expect(router.generateWithFallback(request,{ ...input,knowledge })).rejects.toMatchObject({ safeCode: 'input_too_large',notSent: true }); expect(f.calls).toEqual([]); expect(f.settlements).toEqual([]);
+  });
+});

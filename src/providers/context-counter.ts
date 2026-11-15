@@ -5,11 +5,14 @@ import type { ProviderId } from '../domain/types.js';
 import type { ProviderAdapter } from './common.js';
 import type { ProviderRepository } from './store.js';
 import { ProviderFailure } from './http.js';
+import type { KnowledgeSource } from '../knowledge/types.js';
+import { requireCurrentReferences } from './references.js';
+import { knowledgeLimits } from '../knowledge/limits.js';
 /** Internal composition bridge: keys remain within providers. Counting is preflight
  * only; reservations and generation still belong exclusively to ProviderRouter.
  */
 export class ProviderInputCounter {
-  constructor(private readonly repository: ProviderRepository,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly repository: ProviderRepository,private readonly cipher: Pick<CredentialCipher,'open'>,private readonly adapters: ReadonlyMap<ProviderId,ProviderAdapter>,private readonly now: () => Date = () => new Date(),private readonly references?: Pick<KnowledgeSource,'current'>) {}
   readonly countInput: InputCounter = async (provider,input,signal,scope) => {
     if (signal.aborted) throw new ProviderFailure('transient','cancelled_before_send',{ notSent: true });
     const config = await this.repository.load(scope.guildId,this.now());
@@ -18,9 +21,12 @@ export class ProviderInputCounter {
     if (!c || c.blocked || c.retryAt > this.now().getTime() || !adapter) return null;
     if (c.modelId !== input.modelId || (c.effort ?? undefined) !== input.effort || !await this.repository.current(scope.guildId,config,c) || signal.aborted) throw new ProviderFailure('configuration','configuration_changed',{ notSent: true });
     try {
+      if (input.knowledge?.length && (config.knowledgeTokenLimit ?? knowledgeLimits.defaultTokens) === 0) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
+      await requireCurrentReferences(this.references,scope.guildId,input,signal);
       let credential: string;
       try { credential = this.cipher.open(scope.guildId,provider,c); } catch { throw new ProviderFailure('configuration','credential_invalid',{ notSent: true }); }
       const estimate = await adapter.estimateUsage(input,credential,signal),count = estimate-input.maxGenerationTokens;
+      await requireCurrentReferences(this.references,scope.guildId,input,signal);
       if (!Number.isSafeInteger(count) || count < 0) throw new ProviderFailure('uncertain','invalid_usage');
       return count;
     } catch (raw) {

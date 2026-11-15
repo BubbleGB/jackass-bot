@@ -23,6 +23,7 @@ import { ConversationQueue } from '../conversation/queue.js';
 import type { DiscordTransport } from './transport.js';
 import { DiscordDelivery,type DeliveryReport } from './delivery.js';
 import { DiscordHandlers } from './events.js';
+import { KnowledgeRepository } from '../knowledge/repository.js';
 interface Options {
   database: Database; botId: string; creatorId: string; publicOrigin: string; encryptionKey: Buffer; keyVersion: number; transport: DiscordTransport;
   onDelivery?: (request: BotRequest,report: DeliveryReport) => void;
@@ -35,7 +36,8 @@ export function createDiscordApplication(o: Options) {
   const cipher = new CredentialCipher(o.keyVersion,new Map([[o.keyVersion,o.encryptionKey]])),settings = new SettingsService(o.database,access,cipher);
   const config = new PostgresConversationConfigRepository(o.database),history = new DiscordContextSource(get,o.botId,now),providerRepository = new PostgresProviderRepository(o.database);
   const providers = o.providers ?? new Map<ProviderId,ProviderAdapter>([['openai',new OpenAIAdapter()],['google',new GoogleAdapter()]]);
-  const router = new ProviderRouter(providerRepository,new UsageService(o.database),cipher,providers,now),counter = new ProviderInputCounter(providerRepository,cipher,providers,now),context = new ContextBuilder(history,counter.countInput);
+  const knowledge = new KnowledgeRepository(o.database);
+  const router = new ProviderRouter(providerRepository,new UsageService(o.database),cipher,providers,now,knowledge),counter = new ProviderInputCounter(providerRepository,cipher,providers,now,knowledge),context = new ContextBuilder(history,counter.countInput,knowledge);
   const direct = new DirectService(new DirectEligibility(config,history,now),config,history,context,router),guard = new PostgresWorkerGuard(o.database),queue = new ConversationQueue(now);
   const canDeliver = async (r: Parameters<DiscordDelivery['deliverAnswer']>[0],signal: AbortSignal) => {
     try {

@@ -118,7 +118,7 @@ export class AutomaticService {
       if (context.status === 'skipped') { await this.emit(a.request,{ kind: 'skipped',reason: context.reason }); return; }
       const p = settings.providers.find(p => p.modelId !== null && /^[1-9]\d*$/.test(p.dailyAllowance));
       if (!p) throw new ConversationError('context_unavailable');
-      const input: GenerationInput = { instructions: settings.instructions,context: context.context,mode: settings.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
+      const input: GenerationInput = { instructions: settings.instructions,context: context.context,...(context.knowledge?.length ? { knowledge: context.knowledge } : {}),mode: settings.autoPolicy === 'always' ? 'auto_always' : 'auto_conditional',modelId: p.modelId!,maxGenerationTokens: settings.maxGenerationTokens,...(p.effort !== null ? { effort: p.effort } : {}) };
       const result = await this.deps.provider.generateWithFallback(a.request,input,a.revision,this.controls(a.request));
       await this.active(); succeeded = await this.deps.repository.finish(a,true,this.now(),this.deps.worker.token);
       if (succeeded) await this.emit(a.request,{ kind: 'result',result,participantIds: [...new Set(context.context.filter(c => c.kind === 'human').map(c => c.authorId))] });

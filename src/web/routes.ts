@@ -3,9 +3,18 @@ import { SettingsError } from '../access/policy.js';
 import { object,validateProvider,type SettingsPatch } from '../settings/validation.js';
 import { MODELS } from '../providers/catalog.js';
 import type { WebDependencies } from './server.js';
+import { KnowledgeService } from '../knowledge/service.js';
+import { knowledgeLimits } from '../knowledge/limits.js';
 const fields = (value: unknown,allowed: readonly string[]) => { const b = object(value); if (Object.keys(b).some(k => !allowed.includes(k))) throw new SettingsError('invalid_settings'); return b; };
 export async function routes(app: FastifyInstance,d: WebDependencies,actor: (r: FastifyRequest) => Promise<string>) {
   const guild = (r: FastifyRequest) => (r.params as { guildId: string }).guildId;
+  const knowledge = new KnowledgeService(d.database,d.access),entryId = (r: FastifyRequest) => (r.params as { entryId: string }).entryId;
+  const knowledgeWrite = { bodyLimit: knowledgeLimits.httpBodyBytes };
+  app.get('/api/guilds/:guildId/knowledge',async r => knowledge.list(await actor(r),guild(r)));
+  app.get('/api/guilds/:guildId/knowledge/:entryId',async r => ({ entry: await knowledge.get(await actor(r),guild(r),entryId(r)) }));
+  app.post('/api/guilds/:guildId/knowledge',knowledgeWrite,async (r,reply) => reply.status(201).send({ entry: await knowledge.create(await actor(r),guild(r),r.body) }));
+  app.patch('/api/guilds/:guildId/knowledge/:entryId',knowledgeWrite,async r => ({ entry: await knowledge.update(await actor(r),guild(r),entryId(r),r.body) }));
+  app.delete('/api/guilds/:guildId/knowledge/:entryId',async (r,reply) => { await knowledge.remove(await actor(r),guild(r),entryId(r),r.body); return reply.status(204).send(); });
   app.get('/api/servers',async r => d.directory.servers(await actor(r),(r.query as { after?: string }).after));
   app.get('/api/guilds/:guildId/settings',async r => ({ ...await d.settings.getSettingsWithAccess(await actor(r),guild(r)),models: MODELS }));
   app.patch('/api/guilds/:guildId/settings',async r => { const b = fields(r.body,['revision','patch']); return { settings: await d.settings.updateSettings(await actor(r),guild(r),b.patch as SettingsPatch,b.revision as number) }; });

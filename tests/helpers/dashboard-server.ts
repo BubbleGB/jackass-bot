@@ -22,7 +22,7 @@ const proxy = createServer((req,res) => {
   upstream.on('error',() => { if (!res.headersSent) res.writeHead(502); res.end(); });
   req.on('aborted',() => upstream.destroy()); req.pipe(upstream);
 });
-for (const path of ['/','/privacy','/servers','/servers/:guildId','/creator']) f.app.get(path,(_r,reply) => reply.sendFile('index.html'));
+for (const path of ['/','/privacy','/servers','/servers/:guildId','/servers/:guildId/knowledge','/creator']) f.app.get(path,(_r,reply) => reply.sendFile('index.html'));
 f.app.get('/mock/discord',async (r,reply) => {
   const state = encodeURIComponent((r.query as { state: string }).state);
   return reply.type('text/html').send(`<form action="/auth/discord/callback"><input name="iss" type="hidden" value="https://discord.com"><input name="state" type="hidden" value="${state}"><button name="code" value="owner">Continue as owner</button><button name="code" value="delegate">Continue as delegate</button></form>`);
