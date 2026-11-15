@@ -7,7 +7,9 @@ deployment, context fetching, cooldowns or Discord delivery is implemented in th
 
 ## APIs and catalog
 
-The verified two-model catalog and source links are in [compatibility.md](compatibility.md).
+The curated catalog and source links are in [compatibility.md](compatibility.md).
+The additive [GPT-6 Luna contract](openai-luna.md) records its current model-specific
+efforts/limits and preserves the existing GPT-5.4 Mini selection and accounting policy.
 SettingsService now defaults to that catalog while retaining injection for tests. The
 OpenAI adapter uses Responses and its documented request input counter. A shared body
 builder and parity regression verify that the counter receives model, complete trusted

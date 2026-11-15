@@ -1,6 +1,7 @@
 import type { GenerationInput,GenerationResult,NormalizedUsage } from '../domain/types.js';
 import { payload,RESPONSE_SCHEMA,REFUSAL,UNKNOWN_USAGE,normalized,output,safety,type ProviderAdapter } from './common.js';
 import { ProviderFailure,assertHttp,fetchTransport,record,send,tokens,type HttpTransport } from './http.js';
+import { fitsModelTokens,model } from './catalog.js';
 export class OpenAIAdapter implements ProviderAdapter {
   readonly provider = 'openai' as const;
   constructor(private readonly transport: HttpTransport = fetchTransport) {}
@@ -11,7 +12,7 @@ export class OpenAIAdapter implements ProviderAdapter {
   async estimateUsage(input: GenerationInput,credential: string,signal: AbortSignal): Promise<number> {
     const r = await send(this.transport,{ url: 'https://api.openai.com/v1/responses/input_tokens',headers: { authorization: `Bearer ${credential}` },body: this.body(input),signal });
     assertHttp(r); const count = tokens(record(r.body).input_tokens);
-    if (count+input.maxGenerationTokens > 400000) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
+    if (!fitsModelTokens(model(this.provider,input),count,input.maxGenerationTokens)) throw new ProviderFailure('configuration','input_too_large',{ notSent: true });
     return count+input.maxGenerationTokens;
   }
   async generate(input: GenerationInput,credential: string,signal: AbortSignal): Promise<GenerationResult> {
