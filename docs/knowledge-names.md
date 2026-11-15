@@ -78,8 +78,12 @@ cannot be recalled; the check is a pre-send boundary, not retroactive deletion.
 
 ## Names and dashboard
 
-Names prefer Discord guild nickname/display name, then global display name, then
-username. Bound names to 80 code points, remove control/bidi formatting characters,
+Owner amendment, 15 November 2026: names use Discord global display name (`globalName`
+in the SDK / `global_name` in REST), falling back to username when blank or missing.
+Guild nicknames are never selected. This supersedes the original nickname-first policy
+for current/history messages, /ask and bounded member-ID lookup fallback. Available
+author metadata is sufficient; no nickname-dependent lookup is needed.
+Bound names to 80 code points, remove control/bidi formatting characters,
 JSON-encode as message data, retain the actual author ID, and never derive permissions
 or notification recipients from a name. Use message metadata where present; otherwise
 resolve at most 16 selected participant IDs with bounded concurrency/deadline and

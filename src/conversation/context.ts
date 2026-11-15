@@ -39,7 +39,7 @@ export class ContextBuilder {
         if (!automatic && humanTrigger(m,request) && m.content.length > conversationLimits.maxPromptCharacters) throw new ConversationError('input_too_large');
         if (!humanTrigger(m,request) || !this.usable(m,request,automatic)) throw new ConversationError('context_unavailable');
         required = this.convert(m);
-        if (m.serverNameKnown && required.displayName) knownNames.add(m.authorId);
+        if (m.authorNameKnown && required.displayName) knownNames.add(m.authorId);
       }
       const all = new Map<string,ContextMessage>();
       if (automatic && required.text.length <= conversationLimits.maxPromptCharacters && required.text.trim().length > 0) all.set(required.id,required);
@@ -49,7 +49,7 @@ export class ContextBuilder {
         if (signal.aborted) throw new ConversationError('context_unavailable');
         const rows = result.messages;
         if (!Array.isArray(rows) || rows.length > conversationLimits.pageSize) throw new ConversationError('context_unavailable');
-        for (const m of rows) if (this.usable(m,request) && (!automatic || m.content.trim().length > 0) && (request.source === 'ask' || order(this.convert(m),required) < 0) && m.id !== required.id && !all.has(m.id)) { all.set(m.id,this.convert(m)); if (m.serverNameKnown && m.displayName) knownNames.add(m.authorId); }
+        for (const m of rows) if (this.usable(m,request) && (!automatic || m.content.trim().length > 0) && (request.source === 'ask' || order(this.convert(m),required) < 0) && m.id !== required.id && !all.has(m.id)) { all.set(m.id,this.convert(m)); if (m.authorNameKnown && m.displayName) knownNames.add(m.authorId); }
         const cursor = result.before;
         const humans = [...all.values()].filter(m => m.kind === 'human').length;
         if (!cursor || cursor === before || (before !== undefined && BigInt(cursor) >= BigInt(before)) || (humans >= settings.humanContextLimit && [...all.values()].filter(m => m.kind === 'self').length >= settings.selfContextLimit)) break;

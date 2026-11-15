@@ -4,19 +4,20 @@ import { ContextBuilder } from '../../src/conversation/context.js';
 import { request,settings,source,instant,user } from '../helpers/conversation.js';
 import type { ContextMessage } from '../../src/domain/types.js';
 describe('bounded ephemeral participant labels',() => {
-  it('prefers server nickname then display name then username and strips controls without changing IDs',() => {
-    expect(discordName({ nick: 'Nova' },{ global_name: 'Global',username: 'user' })).toBe('Nova');
-    expect(discordName({ nick: null },{ global_name: 'Global',username: 'user' })).toBe('Global');
-    expect(discordName({ nick: '' },{ global_name: null,username: 'user' })).toBe('user');
+  it('uses sanitised global display names or usernames, never guild nicknames',() => {
+    expect(discordName({ nick: 'Guild alias',nickname: 'SDK alias',global_name: '\n\u202eGlobal 🌌\u2066',username: 'user' })).toBe('Global 🌌');
+    for (const global_name of [null,undefined,'',' \n\u202e ', '\ud800']) {
+      expect(discordName({ nick: 'Guild alias',nickname: 'SDK alias',global_name,username: 'user' })).toBe('user');
+    }
     expect(safeName('\n\u202eNova 🌌\u2066')).toBe('Nova 🌌'); expect(safeName('\ud800')).toBeUndefined();
     const name = safeName('👨‍👩‍👧‍👦'.repeat(30))!; expect([...name].length).toBeLessThanOrEqual(nameLimits.characters); expect(name.endsWith('\u200d')).toBe(false);
   });
   it('resolves at most sixteen selected IDs, prioritises requester and keeps all context identity fields',async () => {
     const history = source(),calls: string[] = [],context: ContextMessage[] = [user,...Array.from({ length: 24 },(_,i) => String(700000000000000000n+BigInt(i)))].map((authorId,i) => ({ id: String(i+1),authorId,kind: 'human',text: 'hi',timestamp: instant,displayName: 'fallback' }));
-    history.resolveName = async (_r,id) => { calls.push(id); return 'Nick '+id; };
+    history.resolveName = async (_r,id) => { calls.push(id); return 'Global '+id; };
     const result = await nameContext(history,request,context,new Set(),new AbortController().signal);
     expect(calls).toHaveLength(16); expect(calls[0]).toBe(user); expect(result.map(c => c.authorId)).toEqual(context.map(c => c.authorId));
-    expect(result.filter(c => c.displayName?.startsWith('Nick '))).toHaveLength(16); expect(result.filter(c => c.displayName === 'fallback')).toHaveLength(9);
+    expect(result.filter(c => c.displayName?.startsWith('Global '))).toHaveLength(16); expect(result.filter(c => c.displayName === 'fallback')).toHaveLength(9);
     history.resolveName = async () => 'Fresh name'; expect((await nameContext(history,request,[context[0]!],new Set(),new AbortController().signal))[0]!.displayName).toBe('Fresh name');
   });
   it('uses trusted-source name metadata for ask without another member lookup',async () => {
