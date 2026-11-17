@@ -153,3 +153,34 @@ Temporary Discord verification failures use 503 `verification_unavailable`, dist
 from genuine 403 denial. Initial loading and grants listing have read-only retry controls;
 grants retries preserve unsaved settings. Membership/roles/approval are still checked
 afresh for each protected operation. See [the investigation and live-check limits](settings-access-investigation.md).
+
+
+## Website usability refresh — 17 November 2026
+
+The landing page keeps the supplied artwork and navy/purple/gold identity, adds a
+clearly labelled example conversation, setup steps and native expandable FAQs, and
+explains that relevant knowledge and participant names/IDs may reach the provider.
+There are no remote fonts or new dependencies. The skip link now has a focusable main
+landmark, and main navigation identifies the current area.
+
+Server discovery has a local name/ID search across loaded pages. Pagination remains
+explicit; search does not issue extra Discord/API reads. Discovery failures show a
+retry action instead of implying that no servers are approved. Previously loaded
+servers remain usable after a failed next page; retry uses that page's cursor.
+Knowledge entries can be searched locally by title without replacing the editor or
+its draft. Saving an entry clears the filter so the saved reference is discoverable.
+
+Settings retain a single form and explicit save/conflict recovery. A sticky, horizontally
+scrollable section navigation makes the long page navigable on phones. Timing, history
+and response budgets are grouped separately; channel choices have touch-sized rows.
+The AI enabled/paused badge describes the saved configuration; changing the switch
+requires Save before the badge updates. Usage reset dates include UTC explicitly.
+Mobile inputs use at least 16px text and the save bar respects the safe-area inset.
+Knowledge actions remain in document flow so they do not obscure pasted text.
+
+Browser regression checks cover discovery failure/retry, local search/pagination,
+knowledge draft preservation, keyboard skip/navigation, reduced motion, narrow-screen
+layout with enlarged text, and existing mobile save, conflict, provider and access-loss
+flows. They use the existing real backend/isolated PostgreSQL harness with mocked Discord.
+Viewport emulation is not a physical Android test. This refresh needs no database
+migration, Compose change or secret change; publication and VPS rollout are separate.
